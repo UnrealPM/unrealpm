@@ -94,11 +94,12 @@ fn show_config() -> Result<()> {
                 "│  📌 Configured:                                                              │"
             );
             for engine in configured {
+                let path_str = truncate_path(&engine.path, 58);
                 println!(
-                    "│     {} → {}{}│",
-                    format!("{:6}", engine.version),
-                    truncate_path(&engine.path, 58),
-                    " ".repeat(58_usize.saturating_sub(truncate_path(&engine.path, 58).len()))
+                    "│     {:6} → {}{}│",
+                    engine.version,
+                    path_str,
+                    " ".repeat(58_usize.saturating_sub(path_str.len()))
                 );
             }
             println!(
@@ -111,11 +112,12 @@ fn show_config() -> Result<()> {
                 "│  🔍 Auto-detected:                                                           │"
             );
             for engine in auto_detected {
+                let path_str = truncate_path(&engine.path, 58);
                 println!(
-                    "│     {} → {}{}│",
-                    format!("{:6}", engine.version),
-                    truncate_path(&engine.path, 58),
-                    " ".repeat(58_usize.saturating_sub(truncate_path(&engine.path, 58).len()))
+                    "│     {:6} → {}{}│",
+                    engine.version,
+                    path_str,
+                    " ".repeat(58_usize.saturating_sub(path_str.len()))
                 );
             }
             println!(
@@ -154,7 +156,7 @@ fn format_bool(value: bool) -> String {
     }
 }
 
-fn truncate_path(path: &std::path::PathBuf, max_len: usize) -> String {
+fn truncate_path(path: &std::path::Path, max_len: usize) -> String {
     let path_str = path.display().to_string();
     if path_str.len() <= max_len {
         path_str
@@ -291,12 +293,7 @@ fn remove_engine(version: &str) -> Result<()> {
     println!("🗑️  Removing Unreal Engine {}...", version);
     println!();
 
-    if config
-        .engines
-        .iter()
-        .find(|e| e.version == version)
-        .is_none()
-    {
+    if !config.engines.iter().any(|e| e.version == version) {
         println!(
             "  ❌ Engine version '{}' not found in configured engines",
             version
@@ -358,11 +355,12 @@ fn list_engines() -> Result<()> {
                 "  ┌──────────────────────────────────────────────────────────────────────────┐"
             );
             for engine in configured {
+                let path_str = truncate_path(&engine.path, 60);
                 println!(
-                    "  │  {} → {}{}│",
-                    format!("{:6}", engine.version),
-                    truncate_path(&engine.path, 60),
-                    " ".repeat(60_usize.saturating_sub(truncate_path(&engine.path, 60).len()))
+                    "  │  {:6} → {}{}│",
+                    engine.version,
+                    path_str,
+                    " ".repeat(60_usize.saturating_sub(path_str.len()))
                 );
             }
             println!(
@@ -377,11 +375,12 @@ fn list_engines() -> Result<()> {
                 "  ┌──────────────────────────────────────────────────────────────────────────┐"
             );
             for engine in auto_detected {
+                let path_str = truncate_path(&engine.path, 60);
                 println!(
-                    "  │  {} → {}{}│",
-                    format!("{:6}", engine.version),
-                    truncate_path(&engine.path, 60),
-                    " ".repeat(60_usize.saturating_sub(truncate_path(&engine.path, 60).len()))
+                    "  │  {:6} → {}{}│",
+                    engine.version,
+                    path_str,
+                    " ".repeat(60_usize.saturating_sub(path_str.len()))
                 );
             }
             println!(

@@ -75,6 +75,7 @@ pub fn run() -> Result<()> {
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn print_tree_node(
     name: &str,
     version: &str,

@@ -17,7 +17,7 @@
 
 use std::env;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Detect the current platform
 ///
@@ -165,7 +165,7 @@ pub fn detect_unreal_engines() -> Vec<(String, PathBuf)> {
 }
 
 /// Check if a path is a valid Unreal Engine installation
-fn is_valid_engine_install(path: &PathBuf) -> bool {
+fn is_valid_engine_install(path: &Path) -> bool {
     // Check for Engine directory and UnrealBuildTool
     path.join("Engine").exists()
         && (path.join("Engine/Binaries/DotNET/UnrealBuildTool").exists()
@@ -178,7 +178,7 @@ fn is_valid_engine_install(path: &PathBuf) -> bool {
 }
 
 /// Extract engine version from installation path
-fn extract_engine_version(path: &PathBuf) -> Option<String> {
+fn extract_engine_version(path: &Path) -> Option<String> {
     // Try to read version from Engine/Build/Build.version
     let version_file = path.join("Engine/Build/Build.version");
     if let Ok(content) = fs::read_to_string(&version_file) {

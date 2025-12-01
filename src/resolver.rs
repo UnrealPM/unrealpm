@@ -91,7 +91,7 @@ pub fn find_matching_version(
                 if let Some(required_engine) = engine_version {
                     // Parse required engine (e.g., "5.3" -> major=5, minor=3)
                     let req_parts: Vec<&str> = required_engine.split('.').collect();
-                    let req_major = req_parts.get(0).and_then(|s| s.parse::<i32>().ok());
+                    let req_major = req_parts.first().and_then(|s| s.parse::<i32>().ok());
                     let req_minor = req_parts.get(1).and_then(|s| s.parse::<i32>().ok());
 
                     let mut matches = false;

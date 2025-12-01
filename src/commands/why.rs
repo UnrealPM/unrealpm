@@ -52,7 +52,7 @@ pub fn run(package: String) -> Result<()> {
             for dep_name in deps.keys() {
                 reverse_deps
                     .entry(dep_name.clone())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(pkg_name.clone());
             }
         }

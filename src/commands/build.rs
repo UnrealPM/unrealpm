@@ -242,17 +242,15 @@ fn build_plugin(
     let stdout = child.stdout.take().unwrap();
     let reader = BufReader::new(stdout);
 
-    for line in reader.lines() {
-        if let Ok(line) = line {
-            all_output.push(line.clone());
+    for line in reader.lines().map_while(Result::ok) {
+        all_output.push(line.clone());
 
-            // Parse progress like [32/63]
-            if let Some(progress) = parse_build_progress(&line) {
-                let (current, total) = progress;
-                pb.set_length(total);
-                pb.set_position(current);
-                pb.set_message("Compiling...");
-            }
+        // Parse progress like [32/63]
+        if let Some(progress) = parse_build_progress(&line) {
+            let (current, total) = progress;
+            pb.set_length(total);
+            pb.set_position(current);
+            pb.set_message("Compiling...");
         }
     }
 

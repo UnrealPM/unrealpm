@@ -121,12 +121,9 @@ fn show() -> Result<()> {
             let perms = mode & 0o777;
 
             if perms == 0o600 {
-                println!("    Permissions: {} (secure)", format!("{:o}", perms));
+                println!("    Permissions: {:o} (secure)", perms);
             } else {
-                println!(
-                    "    Permissions: {} ⚠ WARNING: Should be 600!",
-                    format!("{:o}", perms)
-                );
+                println!("    Permissions: {:o} ⚠ WARNING: Should be 600!", perms);
             }
         }
     } else {

@@ -26,7 +26,7 @@ pub fn run(
             // Parse engine version (e.g., "5.3", "4.27", "5.4.2")
             let parts: Vec<&str> = eng.split('.').collect();
             let major = parts
-                .get(0)
+                .first()
                 .and_then(|s| s.parse::<i32>().ok())
                 .ok_or_else(|| {
                     anyhow::anyhow!("Invalid engine version format. Use: 4.27, 5.3, etc.")
@@ -427,6 +427,7 @@ fn calculate_checksum(file_path: &Path) -> Result<String> {
 }
 
 /// Publish to HTTP registry
+#[allow(clippy::too_many_arguments)]
 fn publish_to_http(
     http_client: &unrealpm::registry_http::HttpRegistryClient,
     tarball_path: &Path,

@@ -295,43 +295,42 @@ fn start_local_callback_server(tx: mpsc::Sender<(String, String)>) -> Result<u16
             .expect("Failed to create HTTP server from listener");
 
         // Wait for a single request (the callback)
-        if let Ok(request) = server.recv_timeout(Duration::from_secs(300)) {
-            if let Some(request) = request {
-                let url = request.url().to_string();
+        if let Ok(Some(request)) = server.recv_timeout(Duration::from_secs(300)) {
+            let url = request.url().to_string();
 
-                // Parse query parameters from /callback?token=...&username=...
-                if url.starts_with("/callback?") || url.starts_with("/callback?") {
-                    let query = url.trim_start_matches("/callback?");
-                    let mut token = None;
-                    let mut username = String::from("User");
+            // Parse query parameters from /callback?token=...&username=...
+            if url.starts_with("/callback?") {
+                let query = url.trim_start_matches("/callback?");
+                let mut token = None;
+                let mut username = String::from("User");
 
-                    for param in query.split('&') {
-                        if let Some((key, value)) = param.split_once('=') {
-                            match key {
-                                "token" => {
-                                    token = Some(
-                                        urlencoding::decode(value)
-                                            .unwrap_or_else(|_| value.into())
-                                            .into_owned(),
-                                    );
-                                }
-                                "username" => {
-                                    username = urlencoding::decode(value)
+                for param in query.split('&') {
+                    if let Some((key, value)) = param.split_once('=') {
+                        match key {
+                            "token" => {
+                                token = Some(
+                                    urlencoding::decode(value)
                                         .unwrap_or_else(|_| value.into())
-                                        .into_owned();
-                                }
-                                _ => {}
+                                        .into_owned(),
+                                );
                             }
+                            "username" => {
+                                username = urlencoding::decode(value)
+                                    .unwrap_or_else(|_| value.into())
+                                    .into_owned();
+                            }
+                            _ => {}
                         }
                     }
+                }
 
-                    if let Some(token) = token {
-                        // Send token back to main thread
-                        let _ = tx.send((token, username.clone()));
+                if let Some(token) = token {
+                    // Send token back to main thread
+                    let _ = tx.send((token, username.clone()));
 
-                        // Send success response to browser
-                        let html = format!(
-                            r#"<!DOCTYPE html>
+                    // Send success response to browser
+                    let html = format!(
+                        r#"<!DOCTYPE html>
 <html>
 <head>
     <title>Login Successful - UnrealPM</title>
@@ -347,26 +346,25 @@ fn start_local_callback_server(tx: mpsc::Sender<(String, String)>) -> Result<u16
     <p>You can close this window and return to your terminal.</p>
 </body>
 </html>"#,
-                            username
-                        );
+                        username
+                    );
 
-                        let response = tiny_http::Response::from_string(html).with_header(
-                            tiny_http::Header::from_bytes(
-                                &b"Content-Type"[..],
-                                &b"text/html; charset=utf-8"[..],
-                            )
-                            .unwrap(),
-                        );
-                        let _ = request.respond(response);
-                        return;
-                    }
+                    let response = tiny_http::Response::from_string(html).with_header(
+                        tiny_http::Header::from_bytes(
+                            &b"Content-Type"[..],
+                            &b"text/html; charset=utf-8"[..],
+                        )
+                        .unwrap(),
+                    );
+                    let _ = request.respond(response);
+                    return;
                 }
-
-                // Invalid request - send error response
-                let response = tiny_http::Response::from_string("Invalid callback request")
-                    .with_status_code(400);
-                let _ = request.respond(response);
             }
+
+            // Invalid request - send error response
+            let response =
+                tiny_http::Response::from_string("Invalid callback request").with_status_code(400);
+            let _ = request.respond(response);
         }
     });
 

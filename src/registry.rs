@@ -162,7 +162,7 @@ impl RegistryClient {
     }
 
     /// Create a registry client using the default (file-based for backward compat)
-    pub fn default() -> Result<Self> {
+    pub fn new_default() -> Result<Self> {
         let path = Self::default_registry_path()?;
         Ok(RegistryClient::File(FileRegistryClient::new(path)))
     }
@@ -308,11 +308,11 @@ impl FileRegistryClient {
         let len2 = s2.chars().count();
         let mut matrix = vec![vec![0; len2 + 1]; len1 + 1];
 
-        for i in 0..=len1 {
-            matrix[i][0] = i;
+        for (i, row) in matrix.iter_mut().enumerate().take(len1 + 1) {
+            row[0] = i;
         }
-        for j in 0..=len2 {
-            matrix[0][j] = j;
+        for (j, val) in matrix[0].iter_mut().enumerate().take(len2 + 1) {
+            *val = j;
         }
 
         for (i, c1) in s1.chars().enumerate() {

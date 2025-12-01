@@ -22,6 +22,7 @@ const REGISTRY_URL: &str = "https://registry.unreal.dev";
 // ============================================================================
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct PackageListResponse {
     packages: Vec<PackageInfo>,
     total: usize,
@@ -30,6 +31,7 @@ struct PackageListResponse {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct PackageInfo {
     name: String,
     description: Option<String>,
@@ -37,6 +39,7 @@ struct PackageInfo {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct PackageDetailResponse {
     name: String,
     description: Option<String>,
@@ -45,6 +48,7 @@ struct PackageDetailResponse {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct VersionInfo {
     version: String,
     published_at: String,
@@ -62,6 +66,7 @@ struct VersionInfo {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct VersionDetailResponse {
     version: String,
     checksum: String,
@@ -80,6 +85,7 @@ struct VersionDetailResponse {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct DependencyInfo {
     name: String,
     version_constraint: String,
@@ -87,6 +93,7 @@ struct DependencyInfo {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct BinaryInfo {
     platform: String,
     engine: String,

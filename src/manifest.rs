@@ -304,6 +304,50 @@ impl UPlugin {
     }
 }
 
+/// Custom deserializer for Version field that accepts both int and float
+fn deserialize_version<'de, D>(deserializer: D) -> std::result::Result<i32, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de;
+
+    struct VersionVisitor;
+
+    impl<'de> de::Visitor<'de> for VersionVisitor {
+        type Value = i32;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("an integer or float version number")
+        }
+
+        fn visit_i64<E>(self, value: i64) -> std::result::Result<i32, E>
+        where
+            E: de::Error,
+        {
+            Ok(value as i32)
+        }
+
+        fn visit_u64<E>(self, value: u64) -> std::result::Result<i32, E>
+        where
+            E: de::Error,
+        {
+            Ok(value as i32)
+        }
+
+        fn visit_f64<E>(self, value: f64) -> std::result::Result<i32, E>
+        where
+            E: de::Error,
+        {
+            // Convert float to int (5.3 -> 53000, 4.27 -> 42700)
+            let major = value.floor() as i32;
+            let minor = ((value - major as f64) * 100.0).round() as i32;
+            Ok(major * 10000 + minor * 100)
+        }
+    }
+
+    deserializer.deserialize_any(VersionVisitor)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -399,48 +443,4 @@ mod tests {
         assert_eq!(uplugin.friendly_name, "My Plugin");
         assert_eq!(uplugin.category, Some("Gameplay".to_string()));
     }
-}
-
-/// Custom deserializer for Version field that accepts both int and float
-fn deserialize_version<'de, D>(deserializer: D) -> std::result::Result<i32, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    use serde::de;
-
-    struct VersionVisitor;
-
-    impl<'de> de::Visitor<'de> for VersionVisitor {
-        type Value = i32;
-
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            formatter.write_str("an integer or float version number")
-        }
-
-        fn visit_i64<E>(self, value: i64) -> std::result::Result<i32, E>
-        where
-            E: de::Error,
-        {
-            Ok(value as i32)
-        }
-
-        fn visit_u64<E>(self, value: u64) -> std::result::Result<i32, E>
-        where
-            E: de::Error,
-        {
-            Ok(value as i32)
-        }
-
-        fn visit_f64<E>(self, value: f64) -> std::result::Result<i32, E>
-        where
-            E: de::Error,
-        {
-            // Convert float to int (5.3 -> 53000, 4.27 -> 42700)
-            let major = value.floor() as i32;
-            let minor = ((value - major as f64) * 100.0).round() as i32;
-            Ok(major * 10000 + minor * 100)
-        }
-    }
-
-    deserializer.deserialize_any(VersionVisitor)
 }

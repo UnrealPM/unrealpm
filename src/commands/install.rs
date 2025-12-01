@@ -161,7 +161,7 @@ fn install_single_package(
 
         // Check if auto-build would be triggered
         let config = Config::load()?;
-        let was_source_install = install_type.as_ref().map_or(true, |t| t.contains("source"));
+        let was_source_install = install_type.as_ref().is_none_or(|t| t.contains("source"));
 
         if config.build.auto_build_on_install && was_source_install && engine_version.is_some() {
             println!(
@@ -267,28 +267,30 @@ fn install_single_package(
     println!("  ✓ Installed to {}", installed_path.display());
 
     // Check if we should auto-build binaries (config already loaded above)
-    let was_source_install = install_type.as_ref().map_or(true, |t| t.contains("source"));
+    let was_source_install = install_type.as_ref().is_none_or(|t| t.contains("source"));
 
-    if config.build.auto_build_on_install && was_source_install && engine_version.is_some() {
-        println!();
-        println!("⚙ Auto-build enabled, building binaries...");
-        println!();
+    if let Some(engine_ver) = engine_version {
+        if config.build.auto_build_on_install && was_source_install {
+            println!();
+            println!("⚙ Auto-build enabled, building binaries...");
+            println!();
 
-        let current_platform = unrealpm::detect_platform();
-        match crate::commands::build::build_for_platform(
-            &installed_path,
-            &package_name,
-            engine_version.unwrap(),
-            &current_platform,
-            &config,
-        ) {
-            Ok(_) => println!("  ✓ Built for {}", current_platform),
-            Err(e) => {
-                eprintln!("  ✗ Build failed: {}", e);
-                eprintln!("  Plugin installed as source-only");
+            let current_platform = unrealpm::detect_platform();
+            match crate::commands::build::build_for_platform(
+                &installed_path,
+                &package_name,
+                engine_ver,
+                &current_platform,
+                &config,
+            ) {
+                Ok(_) => println!("  ✓ Built for {}", current_platform),
+                Err(e) => {
+                    eprintln!("  ✗ Build failed: {}", e);
+                    eprintln!("  Plugin installed as source-only");
+                }
             }
+            println!();
         }
-        println!();
     }
 
     // Update manifest (preserve engine version from earlier load)

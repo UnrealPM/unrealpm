@@ -254,12 +254,10 @@ IMPLEMENT_MODULE(FDefaultModuleImpl, {})
         fs::write(source_dir.join(format!("{}.cpp", self.name)), module_cpp)
             .expect("Failed to write module cpp");
 
-        let module_h = format!(
-            r#"#pragma once
+        let module_h = r#"#pragma once
 
 #include "CoreMinimal.h"
-"#
-        );
+"#;
         fs::write(source_dir.join(format!("{}.h", self.name)), module_h)
             .expect("Failed to write module header");
 

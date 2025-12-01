@@ -138,7 +138,7 @@ fn default_public_key_path() -> String {
     "~/.unrealpm/keys/public_key.pem".to_string()
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct VerificationConfig {
     /// Require signature verification when installing packages
     #[serde(default)]
@@ -155,24 +155,10 @@ impl Default for SigningConfig {
     }
 }
 
-impl Default for VerificationConfig {
-    fn default() -> Self {
-        Self {
-            require_signatures: false,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AuthConfig {
     /// API token for publishing to HTTP registry
     pub token: Option<String>,
-}
-
-impl Default for AuthConfig {
-    fn default() -> Self {
-        Self { token: None }
-    }
 }
 
 impl Default for Config {
