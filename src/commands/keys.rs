@@ -17,8 +17,10 @@ fn generate() -> Result<()> {
     let config = Config::load()?;
 
     // Expand tilde in paths
-    let private_key_path = PathBuf::from(shellexpand::tilde(&config.signing.private_key_path).to_string());
-    let public_key_path = PathBuf::from(shellexpand::tilde(&config.signing.public_key_path).to_string());
+    let private_key_path =
+        PathBuf::from(shellexpand::tilde(&config.signing.private_key_path).to_string());
+    let public_key_path =
+        PathBuf::from(shellexpand::tilde(&config.signing.public_key_path).to_string());
 
     // Check if keys already exist
     if private_key_path.exists() || public_key_path.exists() {
@@ -84,8 +86,10 @@ fn show() -> Result<()> {
     let config = Config::load()?;
 
     // Expand tilde in paths
-    let private_key_path = PathBuf::from(shellexpand::tilde(&config.signing.private_key_path).to_string());
-    let public_key_path = PathBuf::from(shellexpand::tilde(&config.signing.public_key_path).to_string());
+    let private_key_path =
+        PathBuf::from(shellexpand::tilde(&config.signing.private_key_path).to_string());
+    let public_key_path =
+        PathBuf::from(shellexpand::tilde(&config.signing.public_key_path).to_string());
 
     // Check if keys exist
     if !private_key_path.exists() && !public_key_path.exists() {
@@ -119,7 +123,10 @@ fn show() -> Result<()> {
             if perms == 0o600 {
                 println!("    Permissions: {} (secure)", format!("{:o}", perms));
             } else {
-                println!("    Permissions: {} ⚠ WARNING: Should be 600!", format!("{:o}", perms));
+                println!(
+                    "    Permissions: {} ⚠ WARNING: Should be 600!",
+                    format!("{:o}", perms)
+                );
             }
         }
     } else {
@@ -140,7 +147,14 @@ fn show() -> Result<()> {
                 println!("Public Key (share this with users):");
                 println!("  {}", keys.public_key_hex());
                 println!();
-                println!("Signing: {}", if config.signing.enabled { "Enabled ✓" } else { "Disabled ✗" });
+                println!(
+                    "Signing: {}",
+                    if config.signing.enabled {
+                        "Enabled ✓"
+                    } else {
+                        "Disabled ✗"
+                    }
+                );
                 println!();
             }
             Err(e) => {

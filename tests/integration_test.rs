@@ -78,7 +78,9 @@ fn test_install_single_package() {
         .arg("base-utils@^1.0.0")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Successfully installed base-utils"));
+        .stdout(predicate::str::contains(
+            "Successfully installed base-utils",
+        ));
 
     // Verify plugin was installed
     let plugin_path = temp_dir.path().join("Plugins/base-utils");
@@ -112,7 +114,9 @@ fn test_install_with_transitive_dependencies() {
         .arg("multiplayer-toolkit@^2.0.0")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Successfully installed multiplayer-toolkit"));
+        .stdout(predicate::str::contains(
+            "Successfully installed multiplayer-toolkit",
+        ));
 
     // Run install to get all transitive dependencies
     unrealpm_cmd()
@@ -164,7 +168,9 @@ fn test_uninstall_command() {
         .arg("base-utils")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Successfully uninstalled base-utils"));
+        .stdout(predicate::str::contains(
+            "Successfully uninstalled base-utils",
+        ));
 
     // Verify it was removed
     assert!(!plugin_path.exists(), "Plugin should be removed");
@@ -208,7 +214,9 @@ fn test_lockfile_reproducibility() {
 
     // Extract version and checksum (ignore timestamp)
     assert!(new_lockfile_content.contains("version = \"1.0.0\""));
-    assert!(new_lockfile_content.contains("checksum = \"00adf0997d0926e6965a852b834fe144abddb8e54ebc47cd540abe639e966241\""));
+    assert!(new_lockfile_content.contains(
+        "checksum = \"00adf0997d0926e6965a852b834fe144abddb8e54ebc47cd540abe639e966241\""
+    ));
 }
 
 #[test]

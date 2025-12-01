@@ -108,8 +108,7 @@ fn run_email_login() -> Result<()> {
     }
 
     // Prompt for password (securely)
-    let password = rpassword::prompt_password("Password: ")
-        .context("Failed to read password")?;
+    let password = rpassword::prompt_password("Password: ").context("Failed to read password")?;
 
     if password.is_empty() {
         anyhow::bail!("Password cannot be empty");
@@ -133,20 +132,23 @@ fn run_email_login() -> Result<()> {
     let status = response.status();
 
     if status.is_success() {
-        let login_response: LoginResponse = response.json()
-            .context("Failed to parse login response")?;
+        let login_response: LoginResponse =
+            response.json().context("Failed to parse login response")?;
 
         // Save token to config
         config.auth.token = Some(login_response.token);
-        config.save()
+        config
+            .save()
             .context("Failed to save authentication token to config")?;
 
         println!("✓ Login successful!");
         println!();
         println!("Your authentication token has been saved to ~/.unrealpm/config.toml");
-        println!("Token expires in {} seconds (~{} hours)",
+        println!(
+            "Token expires in {} seconds (~{} hours)",
             login_response.expires_in,
-            login_response.expires_in / 3600);
+            login_response.expires_in / 3600
+        );
         println!();
         println!("You can now publish packages with: unrealpm publish");
     } else {
@@ -154,7 +156,11 @@ fn run_email_login() -> Result<()> {
         let error_msg = if let Ok(error_response) = response.json::<ErrorResponse>() {
             error_response.error
         } else {
-            format!("HTTP {}: {}", status.as_u16(), status.canonical_reason().unwrap_or("Unknown error"))
+            format!(
+                "HTTP {}: {}",
+                status.as_u16(),
+                status.canonical_reason().unwrap_or("Unknown error")
+            )
         };
 
         println!("✗ Login failed: {}", error_msg);
@@ -163,7 +169,10 @@ fn run_email_login() -> Result<()> {
         if status.as_u16() == 401 {
             println!("Please check your email and password.");
             println!();
-            println!("Don't have an account? Register at: {}/register", registry_url);
+            println!(
+                "Don't have an account? Register at: {}/register",
+                registry_url
+            );
         } else if status.as_u16() == 404 {
             println!("Registry endpoint not found. Is the registry server running?");
             println!("Registry URL: {}", registry_url);
@@ -185,8 +194,7 @@ pub fn run_logout() -> Result<()> {
     }
 
     config.auth.token = None;
-    config.save()
-        .context("Failed to save config")?;
+    config.save().context("Failed to save config")?;
 
     println!("✓ Logged out successfully");
     println!();
@@ -250,7 +258,8 @@ fn run_github_oauth() -> Result<()> {
         Ok((token, username)) => {
             // Save token to config
             config.auth.token = Some(token);
-            config.save()
+            config
+                .save()
                 .context("Failed to save authentication token to config")?;
 
             println!("✓ Login successful!");
@@ -276,8 +285,8 @@ fn run_github_oauth() -> Result<()> {
 /// Returns the port number the server is listening on
 fn start_local_callback_server(tx: mpsc::Sender<(String, String)>) -> Result<u16> {
     // Try to bind to a random available port
-    let listener = TcpListener::bind("127.0.0.1:0")
-        .context("Failed to start local callback server")?;
+    let listener =
+        TcpListener::bind("127.0.0.1:0").context("Failed to start local callback server")?;
     let port = listener.local_addr()?.port();
 
     // Spawn the server in a background thread
@@ -300,9 +309,11 @@ fn start_local_callback_server(tx: mpsc::Sender<(String, String)>) -> Result<u16
                         if let Some((key, value)) = param.split_once('=') {
                             match key {
                                 "token" => {
-                                    token = Some(urlencoding::decode(value)
-                                        .unwrap_or_else(|_| value.into())
-                                        .into_owned());
+                                    token = Some(
+                                        urlencoding::decode(value)
+                                            .unwrap_or_else(|_| value.into())
+                                            .into_owned(),
+                                    );
                                 }
                                 "username" => {
                                     username = urlencoding::decode(value)
@@ -339,13 +350,13 @@ fn start_local_callback_server(tx: mpsc::Sender<(String, String)>) -> Result<u16
                             username
                         );
 
-                        let response = tiny_http::Response::from_string(html)
-                            .with_header(
-                                tiny_http::Header::from_bytes(
-                                    &b"Content-Type"[..],
-                                    &b"text/html; charset=utf-8"[..],
-                                ).unwrap()
-                            );
+                        let response = tiny_http::Response::from_string(html).with_header(
+                            tiny_http::Header::from_bytes(
+                                &b"Content-Type"[..],
+                                &b"text/html; charset=utf-8"[..],
+                            )
+                            .unwrap(),
+                        );
                         let _ = request.respond(response);
                         return;
                     }

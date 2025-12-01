@@ -1,6 +1,6 @@
 use anyhow::Result;
-use unrealpm::{Manifest, UProject};
 use std::env;
+use unrealpm::{Manifest, UProject};
 
 pub fn run() -> Result<()> {
     let current_dir = env::current_dir()?;
@@ -25,7 +25,9 @@ pub fn run() -> Result<()> {
         }
         Err(_) => {
             println!("⚠ No .uproject file found in current directory");
-            println!("  You can still use UnrealPM, but it works best in an Unreal Engine project.");
+            println!(
+                "  You can still use UnrealPM, but it works best in an Unreal Engine project."
+            );
             None
         }
     };

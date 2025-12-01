@@ -97,7 +97,7 @@ impl Manifest {
 
         if !manifest_path.exists() {
             return Err(Error::InvalidManifest(
-                "unrealpm.json not found. Run 'unrealpm init' first.".to_string()
+                "unrealpm.json not found. Run 'unrealpm init' first.".to_string(),
             ));
         }
 
@@ -284,7 +284,7 @@ impl UPlugin {
         }
 
         Err(Error::InvalidManifest(
-            "No .uplugin file found in current directory".to_string()
+            "No .uplugin file found in current directory".to_string(),
         ))
     }
 

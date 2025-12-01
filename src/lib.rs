@@ -42,23 +42,28 @@
 //! - [`config`] - User and project configuration management
 //! - [`error`] - Error types and result handling
 
+pub mod config;
 pub mod error;
-pub mod manifest;
-pub mod resolver;
 pub mod installer;
 pub mod lockfile;
+pub mod manifest;
+pub mod platform;
 pub mod registry;
 pub mod registry_http;
-pub mod platform;
-pub mod config;
+pub mod resolver;
 pub mod signing;
 
-pub use error::{Error, Result};
-pub use manifest::{Manifest, UProject, UPlugin};
-pub use registry::{Dependency, PackageMetadata, PackageType, PackageVersion, PrebuiltBinary, RegistryClient};
-pub use resolver::{find_matching_version, resolve_dependencies, ResolvedPackage};
-pub use installer::{install_package, verify_checksum};
-pub use lockfile::{Lockfile, LockedPackage, LOCKFILE_NAME};
-pub use platform::{detect_platform, detect_unreal_engines, normalize_engine_version, resolve_engine_association, wsl_to_windows_path};
 pub use config::Config;
-pub use signing::{PackageSigningKey, load_or_generate_keys, verify_signature};
+pub use error::{Error, Result};
+pub use installer::{install_package, verify_checksum};
+pub use lockfile::{LockedPackage, Lockfile, LOCKFILE_NAME};
+pub use manifest::{Manifest, UPlugin, UProject};
+pub use platform::{
+    detect_platform, detect_unreal_engines, normalize_engine_version, resolve_engine_association,
+    wsl_to_windows_path,
+};
+pub use registry::{
+    Dependency, PackageMetadata, PackageType, PackageVersion, PrebuiltBinary, RegistryClient,
+};
+pub use resolver::{find_matching_version, resolve_dependencies, ResolvedPackage};
+pub use signing::{load_or_generate_keys, verify_signature, PackageSigningKey};

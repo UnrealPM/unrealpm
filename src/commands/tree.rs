@@ -43,9 +43,8 @@ pub fn run() -> Result<()> {
     for (pkg_name, pkg) in lockfile.packages.iter() {
         if let Some(deps) = &pkg.dependencies {
             // Convert HashMap to Vec of tuples
-            let deps_vec: Vec<(String, String)> = deps.iter()
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect();
+            let deps_vec: Vec<(String, String)> =
+                deps.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
             dep_map.insert(pkg_name.clone(), deps_vec);
         } else {
             dep_map.insert(pkg_name.clone(), Vec::new());

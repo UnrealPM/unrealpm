@@ -34,22 +34,40 @@ pub fn run(package_spec: String) -> Result<()> {
                 pkg.version.clone()
             } else {
                 // Use latest version from registry
-                metadata.versions.last()
-                    .ok_or_else(|| anyhow::anyhow!("No versions available for package '{}'", package_name))?
-                    .version.clone()
+                metadata
+                    .versions
+                    .last()
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("No versions available for package '{}'", package_name)
+                    })?
+                    .version
+                    .clone()
             }
         } else {
             // No lockfile, use latest from registry
-            metadata.versions.last()
-                .ok_or_else(|| anyhow::anyhow!("No versions available for package '{}'", package_name))?
-                .version.clone()
+            metadata
+                .versions
+                .last()
+                .ok_or_else(|| {
+                    anyhow::anyhow!("No versions available for package '{}'", package_name)
+                })?
+                .version
+                .clone()
         }
     };
 
     // Find the version in metadata
-    let package_version = metadata.versions.iter()
+    let package_version = metadata
+        .versions
+        .iter()
         .find(|v| v.version == version_to_verify)
-        .ok_or_else(|| anyhow::anyhow!("Version {} not found for package '{}'", version_to_verify, package_name))?;
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "Version {} not found for package '{}'",
+                version_to_verify,
+                package_name
+            )
+        })?;
 
     println!("Verifying {}@{}...", package_name, version_to_verify);
     println!();
@@ -115,7 +133,10 @@ pub fn run(package_spec: String) -> Result<()> {
     if is_valid {
         println!("  ✓ SIGNATURE VALID");
         println!();
-        println!("✓ Package {}@{} is authentic and has not been tampered with", package_name, version_to_verify);
+        println!(
+            "✓ Package {}@{} is authentic and has not been tampered with",
+            package_name, version_to_verify
+        );
         println!();
         println!("Publisher public key: {}", public_key);
         println!();

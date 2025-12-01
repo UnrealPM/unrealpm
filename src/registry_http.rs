@@ -1,4 +1,4 @@
-use crate::{Error, PackageMetadata, PackageVersion, PackageType, Result};
+use crate::{Error, PackageMetadata, PackageType, PackageVersion, Result};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -53,26 +53,27 @@ impl HttpRegistryClient {
     pub fn get_package(&self, name: &str) -> Result<PackageMetadata> {
         let url = format!("{}/api/v1/packages/{}", self.base_url, name);
 
-        let response = self.client.get(&url)
-            .send()
-            .map_err(|e| {
-                if e.is_connect() {
-                    Error::Other(format!(
-                        "Cannot connect to registry at {}\n\
+        let response = self.client.get(&url).send().map_err(|e| {
+            if e.is_connect() {
+                Error::Other(format!(
+                    "Cannot connect to registry at {}\n\
                         Please check that the registry is running and the URL is correct.",
-                        self.base_url
-                    ))
-                } else if e.is_timeout() {
-                    Error::Other("Registry request timed out. Please try again.".to_string())
-                } else {
-                    Error::Other(format!("Failed to fetch package: {}", e))
-                }
-            })?;
+                    self.base_url
+                ))
+            } else if e.is_timeout() {
+                Error::Other("Registry request timed out. Please try again.".to_string())
+            } else {
+                Error::Other(format!("Failed to fetch package: {}", e))
+            }
+        })?;
 
         let status = response.status();
 
         if status == 404 {
-            return Err(Error::PackageNotFound(format!("Package '{}' not found in registry", name)));
+            return Err(Error::PackageNotFound(format!(
+                "Package '{}' not found in registry",
+                name
+            )));
         }
 
         if !status.is_success() {
@@ -88,32 +89,37 @@ impl HttpRegistryClient {
         }
 
         // Parse response
-        let api_response: ApiPackageResponse = response.json()
+        let api_response: ApiPackageResponse = response
+            .json()
             .map_err(|e| Error::Other(format!("Failed to parse response: {}", e)))?;
 
         // Use data from list endpoint (already has all fields including engine info)
-        let versions: Vec<PackageVersion> = api_response.versions.into_iter().map(|version_info| {
-            let package_type = match version_info.package_type.as_str() {
-                "binary" => PackageType::Binary,
-                "hybrid" => PackageType::Hybrid,
-                _ => PackageType::Source,
-            };
+        let versions: Vec<PackageVersion> = api_response
+            .versions
+            .into_iter()
+            .map(|version_info| {
+                let package_type = match version_info.package_type.as_str() {
+                    "binary" => PackageType::Binary,
+                    "hybrid" => PackageType::Hybrid,
+                    _ => PackageType::Source,
+                };
 
-            PackageVersion {
-                version: version_info.version.clone(),
-                tarball: version_info.tarball_url.clone(), // Use actual tarball URL from API
-                checksum: version_info.checksum.clone(),
-                engine_versions: version_info.engine_versions.clone(),
-                engine_major: version_info.engine_major,
-                engine_minor: version_info.engine_minor,
-                is_multi_engine: version_info.is_multi_engine,
-                package_type,
-                binaries: None,
-                dependencies: None, // Dependencies fetched separately if needed
-                public_key: version_info.public_key.clone(),
-                signed_at: version_info.signed_at.clone(),
-            }
-        }).collect();
+                PackageVersion {
+                    version: version_info.version.clone(),
+                    tarball: version_info.tarball_url.clone(), // Use actual tarball URL from API
+                    checksum: version_info.checksum.clone(),
+                    engine_versions: version_info.engine_versions.clone(),
+                    engine_major: version_info.engine_major,
+                    engine_minor: version_info.engine_minor,
+                    is_multi_engine: version_info.is_multi_engine,
+                    package_type,
+                    binaries: None,
+                    dependencies: None, // Dependencies fetched separately if needed
+                    public_key: version_info.public_key.clone(),
+                    signed_at: version_info.signed_at.clone(),
+                }
+            })
+            .collect();
 
         Ok(PackageMetadata {
             name: api_response.name,
@@ -124,11 +130,18 @@ impl HttpRegistryClient {
 
     /// Get tarball path (downloads if not cached)
     pub fn get_tarball_path(&self, name: &str, version: &str) -> PathBuf {
-        self.cache_dir.join("tarballs").join(format!("{}-{}.tar.gz", name, version))
+        self.cache_dir
+            .join("tarballs")
+            .join(format!("{}-{}.tar.gz", name, version))
     }
 
     /// Download package tarball with cache-first strategy
-    pub fn download_if_needed(&self, name: &str, version: &str, expected_checksum: &str) -> Result<PathBuf> {
+    pub fn download_if_needed(
+        &self,
+        name: &str,
+        version: &str,
+        expected_checksum: &str,
+    ) -> Result<PathBuf> {
         let cached_path = self.get_tarball_path(name, version);
 
         // Check if already cached and verify checksum
@@ -145,19 +158,28 @@ impl HttpRegistryClient {
         }
 
         // Download from HTTP registry
-        let url = format!("{}/api/v1/packages/{}/{}/download", self.base_url, name, version);
+        let url = format!(
+            "{}/api/v1/packages/{}/{}/download",
+            self.base_url, name, version
+        );
 
         println!("  Downloading from HTTP registry...");
 
-        let response = self.client.get(&url)
+        let response = self
+            .client
+            .get(&url)
             .send()
             .map_err(|e| Error::Other(format!("Failed to download: {}", e)))?;
 
         if !response.status().is_success() {
-            return Err(Error::Other(format!("Download failed: HTTP {}", response.status())));
+            return Err(Error::Other(format!(
+                "Download failed: HTTP {}",
+                response.status()
+            )));
         }
 
-        let bytes = response.bytes()
+        let bytes = response
+            .bytes()
             .map_err(|e| Error::Other(format!("Failed to read response: {}", e)))?;
 
         // Save to cache
@@ -169,12 +191,17 @@ impl HttpRegistryClient {
     }
 
     pub fn get_signature_path(&self, name: &str, version: &str) -> PathBuf {
-        self.cache_dir.join("signatures").join(format!("{}-{}.sig", name, version))
+        self.cache_dir
+            .join("signatures")
+            .join(format!("{}-{}.sig", name, version))
     }
 
     /// Download signature from HTTP registry to cache
     pub fn download_signature(&self, name: &str, version: &str) -> Result<PathBuf> {
-        let url = format!("{}/api/v1/packages/{}/{}/signature", self.base_url, name, version);
+        let url = format!(
+            "{}/api/v1/packages/{}/{}/signature",
+            self.base_url, name, version
+        );
         let sig_path = self.get_signature_path(name, version);
 
         // Check if already cached
@@ -183,19 +210,17 @@ impl HttpRegistryClient {
         }
 
         // Download from registry
-        let response = self.client.get(&url)
-            .send()
-            .map_err(|e| {
-                if e.is_connect() {
-                    Error::Other(format!(
-                        "Cannot connect to registry at {}\n\
+        let response = self.client.get(&url).send().map_err(|e| {
+            if e.is_connect() {
+                Error::Other(format!(
+                    "Cannot connect to registry at {}\n\
                         Please check that the registry is running and the URL is correct.",
-                        self.base_url
-                    ))
-                } else {
-                    Error::Other(format!("Failed to download signature: {}", e))
-                }
-            })?;
+                    self.base_url
+                ))
+            } else {
+                Error::Other(format!("Failed to download signature: {}", e))
+            }
+        })?;
 
         let status = response.status();
 
@@ -204,11 +229,15 @@ impl HttpRegistryClient {
         }
 
         if !status.is_success() {
-            return Err(Error::Other(format!("Failed to download signature: HTTP {}", status.as_u16())));
+            return Err(Error::Other(format!(
+                "Failed to download signature: HTTP {}",
+                status.as_u16()
+            )));
         }
 
         // Save to cache
-        let sig_data = response.bytes()
+        let sig_data = response
+            .bytes()
             .map_err(|e| Error::Other(format!("Failed to read signature data: {}", e)))?;
 
         std::fs::write(&sig_path, sig_data)?;
@@ -230,15 +259,26 @@ impl HttpRegistryClient {
         let metadata_json = serde_json::to_string(&metadata)?;
 
         let form = reqwest::blocking::multipart::Form::new()
-            .part("tarball", reqwest::blocking::multipart::Part::bytes(tarball_bytes)
-                .file_name(tarball_path.file_name().unwrap().to_string_lossy().to_string()))
+            .part(
+                "tarball",
+                reqwest::blocking::multipart::Part::bytes(tarball_bytes).file_name(
+                    tarball_path
+                        .file_name()
+                        .unwrap()
+                        .to_string_lossy()
+                        .to_string(),
+                ),
+            )
             .text("metadata", metadata_json);
 
         // Add signature if provided
         let form = if let Some(sig_path) = signature_path {
             let sig_bytes = std::fs::read(sig_path)?;
-            form.part("signature", reqwest::blocking::multipart::Part::bytes(sig_bytes)
-                .file_name(sig_path.file_name().unwrap().to_string_lossy().to_string()))
+            form.part(
+                "signature",
+                reqwest::blocking::multipart::Part::bytes(sig_bytes)
+                    .file_name(sig_path.file_name().unwrap().to_string_lossy().to_string()),
+            )
         } else {
             form
         };
@@ -270,25 +310,34 @@ impl HttpRegistryClient {
         let status = response.status();
 
         if !status.is_success() {
-            let error_text = response.text().unwrap_or_else(|_| format!("HTTP {}", status.as_u16()));
+            let error_text = response
+                .text()
+                .unwrap_or_else(|_| format!("HTTP {}", status.as_u16()));
 
             // Provide helpful error messages based on status code
             let error_msg = match status.as_u16() {
                 401 => "Authentication required.\n\n\
                     You need to login before publishing.\n\
-                    Run: unrealpm login".to_string(),
+                    Run: unrealpm login"
+                    .to_string(),
                 403 => "Permission denied.\n\n\
                     You do not have permission to publish to this package.\n\
-                    Only the package owner can publish new versions.".to_string(),
+                    Only the package owner can publish new versions."
+                    .to_string(),
                 409 => "Version conflict.\n\n\
                     This version already exists in the registry.\n\
-                    Bump the version in your .uplugin file and try again.".to_string(),
+                    Bump the version in your .uplugin file and try again."
+                    .to_string(),
                 413 => "Package too large.\n\n\
                     The package exceeds the maximum upload size.\n\
-                    Consider excluding unnecessary files from the package.".to_string(),
-                500 | 502 | 503 | 504 => format!("Registry server error.\n\n\
+                    Consider excluding unnecessary files from the package."
+                    .to_string(),
+                500 | 502 | 503 | 504 => format!(
+                    "Registry server error.\n\n\
                     The registry is experiencing issues. Please try again later.\n\n\
-                    Details: {}", error_text),
+                    Details: {}",
+                    error_text
+                ),
                 _ => format!("Publish failed (HTTP {}):\n{}", status.as_u16(), error_text),
             };
 
@@ -324,7 +373,8 @@ impl HttpRegistryClient {
             request = request.header("Authorization", format!("Bearer {}", token));
         }
 
-        let response = request.send()
+        let response = request
+            .send()
             .map_err(|e| Error::Other(format!("Failed to unpublish: {}", e)))?;
 
         if !response.status().is_success() {
@@ -343,7 +393,10 @@ impl HttpRegistryClient {
 
     /// Yank or un-yank a package version
     pub fn yank(&self, name: &str, version: &str, unyank: bool) -> Result<()> {
-        let url = format!("{}/api/v1/packages/{}/{}/yank", self.base_url, name, version);
+        let url = format!(
+            "{}/api/v1/packages/{}/{}/yank",
+            self.base_url, name, version
+        );
 
         let mut request = if unyank {
             self.client.delete(&url)
@@ -355,7 +408,8 @@ impl HttpRegistryClient {
             request = request.header("Authorization", format!("Bearer {}", token));
         }
 
-        let response = request.send()
+        let response = request
+            .send()
             .map_err(|e| Error::Other(format!("Failed to yank/unyank: {}", e)))?;
 
         if !response.status().is_success() {
@@ -374,23 +428,25 @@ impl HttpRegistryClient {
 
     /// Search for packages by query string
     pub fn search(&self, query: &str) -> Result<Vec<String>> {
-        let url = format!("{}/api/v1/packages?q={}", self.base_url, urlencoding::encode(query));
+        let url = format!(
+            "{}/api/v1/packages?q={}",
+            self.base_url,
+            urlencoding::encode(query)
+        );
 
-        let response = self.client.get(&url)
-            .send()
-            .map_err(|e| {
-                if e.is_connect() {
-                    Error::Other(format!(
-                        "Cannot connect to registry at {}\n\
+        let response = self.client.get(&url).send().map_err(|e| {
+            if e.is_connect() {
+                Error::Other(format!(
+                    "Cannot connect to registry at {}\n\
                         Please check that the registry is running and the URL is correct.",
-                        self.base_url
-                    ))
-                } else if e.is_timeout() {
-                    Error::Other("Registry request timed out. Please try again.".to_string())
-                } else {
-                    Error::Other(format!("Failed to search packages: {}", e))
-                }
-            })?;
+                    self.base_url
+                ))
+            } else if e.is_timeout() {
+                Error::Other("Registry request timed out. Please try again.".to_string())
+            } else {
+                Error::Other(format!("Failed to search packages: {}", e))
+            }
+        })?;
 
         let status = response.status();
 
@@ -407,7 +463,8 @@ impl HttpRegistryClient {
         }
 
         // Parse response
-        let api_response: ApiPackageListResponse = response.json()
+        let api_response: ApiPackageListResponse = response
+            .json()
             .map_err(|e| Error::Other(format!("Failed to parse search response: {}", e)))?;
 
         // Extract package names
@@ -427,7 +484,7 @@ fn parse_package_type(s: &str) -> crate::PackageType {
 
 // Helper to calculate file checksum
 fn calculate_checksum(path: &Path) -> Result<String> {
-    use sha2::{Sha256, Digest};
+    use sha2::{Digest, Sha256};
     let data = std::fs::read(path)?;
     let hash = Sha256::digest(&data);
     Ok(format!("{:x}", hash))

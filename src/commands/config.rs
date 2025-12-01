@@ -29,14 +29,22 @@ fn show_config() -> Result<()> {
     // Build settings
     println!("┌─ Build Settings ─────────────────────────────────────────────────────────────┐");
     println!("│                                                                              │");
-    println!("│  Auto-build on publish:  {}                                             │",
-        format_bool(config.build.auto_build_on_publish));
-    println!("│  Auto-build on install:  {}                                             │",
-        format_bool(config.build.auto_build_on_install));
-    println!("│  Target platforms:       {}                                    │",
-        config.build.platforms.join(", "));
-    println!("│  Build configuration:    {}                                       │",
-        config.build.configuration);
+    println!(
+        "│  Auto-build on publish:  {}                                             │",
+        format_bool(config.build.auto_build_on_publish)
+    );
+    println!(
+        "│  Auto-build on install:  {}                                             │",
+        format_bool(config.build.auto_build_on_install)
+    );
+    println!(
+        "│  Target platforms:       {}                                    │",
+        config.build.platforms.join(", ")
+    );
+    println!(
+        "│  Build configuration:    {}                                       │",
+        config.build.configuration
+    );
     println!("│                                                                              │");
     println!("└──────────────────────────────────────────────────────────────────────────────┘");
     println!();
@@ -44,7 +52,10 @@ fn show_config() -> Result<()> {
     // Registry settings
     println!("┌─ Registry Settings ──────────────────────────────────────────────────────────┐");
     println!("│                                                                              │");
-    println!("│  Registry URL:  {}                              │", config.registry.url);
+    println!(
+        "│  Registry URL:  {}                              │",
+        config.registry.url
+    );
     println!("│                                                                              │");
     println!("└──────────────────────────────────────────────────────────────────────────────┘");
     println!();
@@ -56,45 +67,67 @@ fn show_config() -> Result<()> {
     println!("│                                                                              │");
 
     if all_engines.is_empty() {
-        println!("│  No engines found                                                            │");
-        println!("│                                                                              │");
-        println!("│  💡 Engines are auto-detected from standard locations                        │");
+        println!(
+            "│  No engines found                                                            │"
+        );
+        println!(
+            "│                                                                              │"
+        );
+        println!(
+            "│  💡 Engines are auto-detected from standard locations                        │"
+        );
         println!("│  Or add manually: unrealpm config add-engine <version> <path>               │");
     } else {
         // Separate configured vs auto-detected
-        let configured: Vec<_> = all_engines.iter()
+        let configured: Vec<_> = all_engines
+            .iter()
             .filter(|e| config.engines.iter().any(|c| c.version == e.version))
             .collect();
 
-        let auto_detected: Vec<_> = all_engines.iter()
+        let auto_detected: Vec<_> = all_engines
+            .iter()
             .filter(|e| !config.engines.iter().any(|c| c.version == e.version))
             .collect();
 
         if !configured.is_empty() {
-            println!("│  📌 Configured:                                                              │");
+            println!(
+                "│  📌 Configured:                                                              │"
+            );
             for engine in configured {
-                println!("│     {} → {}{}│",
+                println!(
+                    "│     {} → {}{}│",
                     format!("{:6}", engine.version),
                     truncate_path(&engine.path, 58),
-                    " ".repeat(58_usize.saturating_sub(truncate_path(&engine.path, 58).len())));
+                    " ".repeat(58_usize.saturating_sub(truncate_path(&engine.path, 58).len()))
+                );
             }
-            println!("│                                                                              │");
+            println!(
+                "│                                                                              │"
+            );
         }
 
         if !auto_detected.is_empty() {
-            println!("│  🔍 Auto-detected:                                                           │");
+            println!(
+                "│  🔍 Auto-detected:                                                           │"
+            );
             for engine in auto_detected {
-                println!("│     {} → {}{}│",
+                println!(
+                    "│     {} → {}{}│",
                     format!("{:6}", engine.version),
                     truncate_path(&engine.path, 58),
-                    " ".repeat(58_usize.saturating_sub(truncate_path(&engine.path, 58).len())));
+                    " ".repeat(58_usize.saturating_sub(truncate_path(&engine.path, 58).len()))
+                );
             }
-            println!("│                                                                              │");
+            println!(
+                "│                                                                              │"
+            );
         }
 
-        println!("│  Total: {} engine{}                                                         │",
+        println!(
+            "│  Total: {} engine{}                                                         │",
             all_engines.len(),
-            if all_engines.len() == 1 { " " } else { "s" });
+            if all_engines.len() == 1 { " " } else { "s" }
+        );
     }
 
     println!("└──────────────────────────────────────────────────────────────────────────────┘");
@@ -139,14 +172,22 @@ fn set_config(key: &str, value: &str) -> Result<()> {
 
     match key {
         "build.auto_build_on_publish" => {
-            config.build.auto_build_on_publish = value.parse::<bool>()
+            config.build.auto_build_on_publish = value
+                .parse::<bool>()
                 .map_err(|_| anyhow::anyhow!("Invalid boolean value. Use 'true' or 'false'"))?;
-            println!("  ✓ build.auto_build_on_publish = {}", format_bool(config.build.auto_build_on_publish));
+            println!(
+                "  ✓ build.auto_build_on_publish = {}",
+                format_bool(config.build.auto_build_on_publish)
+            );
         }
         "build.auto_build_on_install" => {
-            config.build.auto_build_on_install = value.parse::<bool>()
+            config.build.auto_build_on_install = value
+                .parse::<bool>()
                 .map_err(|_| anyhow::anyhow!("Invalid boolean value. Use 'true' or 'false'"))?;
-            println!("  ✓ build.auto_build_on_install = {}", format_bool(config.build.auto_build_on_install));
+            println!(
+                "  ✓ build.auto_build_on_install = {}",
+                format_bool(config.build.auto_build_on_install)
+            );
         }
         "build.configuration" => {
             config.build.configuration = value.to_string();
@@ -209,11 +250,19 @@ fn add_engine(version: &str, path: &str) -> Result<()> {
 
     // Validate it's an Unreal Engine installation
     let ubt_check = if cfg!(windows) {
-        engine_path.join("Engine/Binaries/DotNET/UnrealBuildTool/UnrealBuildTool.exe").exists()
-            || engine_path.join("Engine/Binaries/DotNET/UnrealBuildTool.exe").exists()
+        engine_path
+            .join("Engine/Binaries/DotNET/UnrealBuildTool/UnrealBuildTool.exe")
+            .exists()
+            || engine_path
+                .join("Engine/Binaries/DotNET/UnrealBuildTool.exe")
+                .exists()
     } else {
-        engine_path.join("Engine/Binaries/DotNET/UnrealBuildTool/UnrealBuildTool").exists()
-            || engine_path.join("Engine/Binaries/DotNET/UnrealBuildTool/UnrealBuildTool.dll").exists()
+        engine_path
+            .join("Engine/Binaries/DotNET/UnrealBuildTool/UnrealBuildTool")
+            .exists()
+            || engine_path
+                .join("Engine/Binaries/DotNET/UnrealBuildTool/UnrealBuildTool.dll")
+                .exists()
     };
 
     if !ubt_check {
@@ -242,8 +291,16 @@ fn remove_engine(version: &str) -> Result<()> {
     println!("🗑️  Removing Unreal Engine {}...", version);
     println!();
 
-    if config.engines.iter().find(|e| e.version == version).is_none() {
-        println!("  ❌ Engine version '{}' not found in configured engines", version);
+    if config
+        .engines
+        .iter()
+        .find(|e| e.version == version)
+        .is_none()
+    {
+        println!(
+            "  ❌ Engine version '{}' not found in configured engines",
+            version
+        );
         println!();
         println!("  💡 View configured engines: unrealpm config list-engines");
         println!();
@@ -285,41 +342,59 @@ fn list_engines() -> Result<()> {
         println!("     unrealpm config add-engine 5.3 /path/to/UE_5.3");
     } else {
         // Separate configured vs auto-detected
-        let configured: Vec<_> = all_engines.iter()
+        let configured: Vec<_> = all_engines
+            .iter()
             .filter(|e| config.engines.iter().any(|c| c.version == e.version))
             .collect();
 
-        let auto_detected: Vec<_> = all_engines.iter()
+        let auto_detected: Vec<_> = all_engines
+            .iter()
             .filter(|e| !config.engines.iter().any(|c| c.version == e.version))
             .collect();
 
         if !configured.is_empty() {
             println!("  📌 Configured Engines:");
-            println!("  ┌──────────────────────────────────────────────────────────────────────────┐");
+            println!(
+                "  ┌──────────────────────────────────────────────────────────────────────────┐"
+            );
             for engine in configured {
-                println!("  │  {} → {}{}│",
+                println!(
+                    "  │  {} → {}{}│",
                     format!("{:6}", engine.version),
                     truncate_path(&engine.path, 60),
-                    " ".repeat(60_usize.saturating_sub(truncate_path(&engine.path, 60).len())));
+                    " ".repeat(60_usize.saturating_sub(truncate_path(&engine.path, 60).len()))
+                );
             }
-            println!("  └──────────────────────────────────────────────────────────────────────────┘");
+            println!(
+                "  └──────────────────────────────────────────────────────────────────────────┘"
+            );
             println!();
         }
 
         if !auto_detected.is_empty() {
             println!("  🔍 Auto-Detected Engines:");
-            println!("  ┌──────────────────────────────────────────────────────────────────────────┐");
+            println!(
+                "  ┌──────────────────────────────────────────────────────────────────────────┐"
+            );
             for engine in auto_detected {
-                println!("  │  {} → {}{}│",
+                println!(
+                    "  │  {} → {}{}│",
                     format!("{:6}", engine.version),
                     truncate_path(&engine.path, 60),
-                    " ".repeat(60_usize.saturating_sub(truncate_path(&engine.path, 60).len())));
+                    " ".repeat(60_usize.saturating_sub(truncate_path(&engine.path, 60).len()))
+                );
             }
-            println!("  └──────────────────────────────────────────────────────────────────────────┘");
+            println!(
+                "  └──────────────────────────────────────────────────────────────────────────┘"
+            );
             println!();
         }
 
-        println!("  📊 Total: {} engine{}", all_engines.len(), if all_engines.len() == 1 { "" } else { "s" });
+        println!(
+            "  📊 Total: {} engine{}",
+            all_engines.len(),
+            if all_engines.len() == 1 { "" } else { "s" }
+        );
     }
     println!();
 

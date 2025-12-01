@@ -90,8 +90,7 @@ require_signatures = false
         REGISTRY_URL
     );
 
-    fs::write(config_dir.join("config.toml"), config_content)
-        .expect("Failed to write config");
+    fs::write(config_dir.join("config.toml"), config_content).expect("Failed to write config");
 }
 
 /// Set up environment to use test project's config
@@ -115,10 +114,7 @@ mod read_only {
         let mut cmd = unrealpm_cmd();
         with_test_config(&mut cmd, temp_dir.path());
 
-        cmd.arg("search")
-            .arg("chroma")
-            .assert()
-            .success();
+        cmd.arg("search").arg("chroma").assert().success();
     }
 
     /// Test that search with empty query returns results
@@ -131,10 +127,7 @@ mod read_only {
         with_test_config(&mut cmd, temp_dir.path());
 
         // Empty search should list packages
-        cmd.arg("search")
-            .arg("")
-            .assert()
-            .success();
+        cmd.arg("search").arg("").assert().success();
     }
 
     /// Test that we can initialize a project with HTTP registry
@@ -168,10 +161,7 @@ mod read_only {
         with_test_config(&mut cmd, temp_dir.path());
 
         // Initialize first
-        cmd.current_dir(&temp_dir)
-            .arg("init")
-            .assert()
-            .success();
+        cmd.current_dir(&temp_dir).arg("init").assert().success();
 
         // List packages
         let mut cmd = unrealpm_cmd();
@@ -272,10 +262,7 @@ mod download {
         // Initialize project
         let mut cmd = unrealpm_cmd();
         with_test_config(&mut cmd, temp_dir.path());
-        cmd.current_dir(&temp_dir)
-            .arg("init")
-            .assert()
-            .success();
+        cmd.current_dir(&temp_dir).arg("init").assert().success();
 
         // Dry-run install
         let mut cmd = unrealpm_cmd();
@@ -301,10 +288,7 @@ mod download {
         // Initialize project
         let mut cmd = unrealpm_cmd();
         with_test_config(&mut cmd, temp_dir.path());
-        cmd.current_dir(&temp_dir)
-            .arg("init")
-            .assert()
-            .success();
+        cmd.current_dir(&temp_dir).arg("init").assert().success();
 
         // Install package
         let mut cmd = unrealpm_cmd();
@@ -353,8 +337,8 @@ mod download {
             .success();
 
         // Read lockfile content
-        let lockfile_content =
-            fs::read_to_string(temp_dir.path().join("unrealpm.lock")).expect("Failed to read lockfile");
+        let lockfile_content = fs::read_to_string(temp_dir.path().join("unrealpm.lock"))
+            .expect("Failed to read lockfile");
 
         // Remove Plugins directory
         fs::remove_dir_all(temp_dir.path().join("Plugins")).expect("Failed to remove Plugins");
@@ -362,14 +346,11 @@ mod download {
         // Reinstall from lockfile
         let mut cmd = unrealpm_cmd();
         with_test_config(&mut cmd, temp_dir.path());
-        cmd.current_dir(&temp_dir)
-            .arg("install")
-            .assert()
-            .success();
+        cmd.current_dir(&temp_dir).arg("install").assert().success();
 
         // Verify lockfile hasn't changed (same versions)
-        let new_lockfile_content =
-            fs::read_to_string(temp_dir.path().join("unrealpm.lock")).expect("Failed to read lockfile");
+        let new_lockfile_content = fs::read_to_string(temp_dir.path().join("unrealpm.lock"))
+            .expect("Failed to read lockfile");
 
         // Extract version lines for comparison (ignore timestamp)
         let extract_versions = |content: &str| -> Vec<String> {
@@ -494,7 +475,9 @@ mod errors {
             .arg("this-package-definitely-does-not-exist-12345")
             .assert()
             .failure()
-            .stderr(predicate::str::contains("not found").or(predicate::str::contains("Not found")));
+            .stderr(
+                predicate::str::contains("not found").or(predicate::str::contains("Not found")),
+            );
     }
 
     /// Test install without explicit init - CLI should handle gracefully
@@ -529,7 +512,9 @@ mod errors {
             .arg("xyznonexistentpackage12345")
             .assert()
             .success()
-            .stdout(predicate::str::contains("No packages found").or(predicate::str::is_empty().not()));
+            .stdout(
+                predicate::str::contains("No packages found").or(predicate::str::is_empty().not()),
+            );
     }
 
     /// Test uninstall package not installed shows warning
@@ -570,21 +555,14 @@ mod authenticated {
     fn test_login_flow() {
         // This test is interactive and requires manual login
         // It verifies the login command runs without crashing
-        unrealpm_cmd()
-            .arg("login")
-            .assert()
-            .success();
+        unrealpm_cmd().arg("login").assert().success();
     }
 
     /// Test tokens list (requires authentication)
     #[test]
     #[ignore]
     fn test_tokens_list() {
-        unrealpm_cmd()
-            .arg("tokens")
-            .arg("list")
-            .assert()
-            .success();
+        unrealpm_cmd().arg("tokens").arg("list").assert().success();
     }
 
     /// Test publish dry-run (requires authentication)
@@ -639,10 +617,7 @@ mod dependencies {
         // Show dependency tree
         let mut cmd = unrealpm_cmd();
         with_test_config(&mut cmd, temp_dir.path());
-        cmd.current_dir(&temp_dir)
-            .arg("tree")
-            .assert()
-            .success();
+        cmd.current_dir(&temp_dir).arg("tree").assert().success();
     }
 
     /// Test outdated command

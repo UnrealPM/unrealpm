@@ -32,10 +32,10 @@ use std::path::PathBuf;
 /// typically uses the Windows Unreal Engine installation from WSL.
 pub fn detect_platform() -> String {
     // Check if running on WSL - default to Win64 since we're using Windows UE
-    let is_wsl = env::var("WSL_DISTRO_NAME").is_ok() ||
-                 fs::read_to_string("/proc/version")
-                     .map(|v| v.contains("microsoft") || v.contains("WSL"))
-                     .unwrap_or(false);
+    let is_wsl = env::var("WSL_DISTRO_NAME").is_ok()
+        || fs::read_to_string("/proc/version")
+            .map(|v| v.contains("microsoft") || v.contains("WSL"))
+            .unwrap_or(false);
 
     if is_wsl {
         return "Win64".to_string();
@@ -49,7 +49,7 @@ pub fn detect_platform() -> String {
         ("linux", "x86_64") => "Linux".to_string(),
         ("macos", "x86_64") => "Mac".to_string(),
         ("macos", "aarch64") => "Mac".to_string(), // Apple Silicon
-        _ => format!("{}-{}", os, arch), // Fallback
+        _ => format!("{}-{}", os, arch),           // Fallback
     }
 }
 
@@ -70,10 +70,10 @@ pub fn detect_unreal_engines() -> Vec<(String, PathBuf)> {
     let mut engines = Vec::new();
 
     // Check if running on WSL
-    let is_wsl = env::var("WSL_DISTRO_NAME").is_ok() ||
-                 fs::read_to_string("/proc/version")
-                     .map(|v| v.contains("microsoft") || v.contains("WSL"))
-                     .unwrap_or(false);
+    let is_wsl = env::var("WSL_DISTRO_NAME").is_ok()
+        || fs::read_to_string("/proc/version")
+            .map(|v| v.contains("microsoft") || v.contains("WSL"))
+            .unwrap_or(false);
 
     if cfg!(windows) || is_wsl {
         // Determine the base path for Windows drives
@@ -167,11 +167,14 @@ pub fn detect_unreal_engines() -> Vec<(String, PathBuf)> {
 /// Check if a path is a valid Unreal Engine installation
 fn is_valid_engine_install(path: &PathBuf) -> bool {
     // Check for Engine directory and UnrealBuildTool
-    path.join("Engine").exists() && (
-        path.join("Engine/Binaries/DotNET/UnrealBuildTool").exists() ||
-        path.join("Engine/Binaries/DotNET/UnrealBuildTool.exe").exists() ||
-        path.join("Engine/Binaries/DotNET/UnrealBuildTool.dll").exists()
-    )
+    path.join("Engine").exists()
+        && (path.join("Engine/Binaries/DotNET/UnrealBuildTool").exists()
+            || path
+                .join("Engine/Binaries/DotNET/UnrealBuildTool.exe")
+                .exists()
+            || path
+                .join("Engine/Binaries/DotNET/UnrealBuildTool.dll")
+                .exists())
 }
 
 /// Extract engine version from installation path

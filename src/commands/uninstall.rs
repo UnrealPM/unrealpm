@@ -38,7 +38,10 @@ pub fn run(package: String) -> Result<()> {
         fs::remove_dir_all(&plugin_path)?;
         println!("  ✓ Removed {}", plugin_path.display());
     } else {
-        println!("  ⚠ Plugin directory not found at {}", plugin_path.display());
+        println!(
+            "  ⚠ Plugin directory not found at {}",
+            plugin_path.display()
+        );
         println!("  (continuing with manifest/lockfile cleanup)");
     }
 

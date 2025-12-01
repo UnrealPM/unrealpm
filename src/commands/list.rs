@@ -1,6 +1,6 @@
 use anyhow::Result;
-use unrealpm::Manifest;
 use std::env;
+use unrealpm::Manifest;
 
 pub fn run() -> Result<()> {
     let current_dir = env::current_dir()?;
@@ -45,7 +45,11 @@ pub fn run() -> Result<()> {
     }
 
     // Summary
-    println!("Total: {} package{}", total_deps, if total_deps == 1 { "" } else { "s" });
+    println!(
+        "Total: {} package{}",
+        total_deps,
+        if total_deps == 1 { "" } else { "s" }
+    );
 
     Ok(())
 }

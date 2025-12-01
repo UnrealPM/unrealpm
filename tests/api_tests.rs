@@ -136,10 +136,7 @@ mod list_packages {
         assert!(response.status().is_success());
         let data: PackageListResponse = response.json().expect("Failed to parse response");
 
-        assert!(
-            data.packages.len() <= 5,
-            "Should return at most 5 packages"
-        );
+        assert!(data.packages.len() <= 5, "Should return at most 5 packages");
         assert_eq!(data.limit, 5);
         assert_eq!(data.offset, 0);
     }
@@ -234,11 +231,7 @@ mod package_details {
 
         let response = client.get(&url).send().expect("Request failed");
 
-        assert_eq!(
-            response.status().as_u16(),
-            404,
-            "Expected 404 Not Found"
-        );
+        assert_eq!(response.status().as_u16(), 404, "Expected 404 Not Found");
     }
 }
 
@@ -274,7 +267,10 @@ mod version_details {
 
         // Get package to find a version
         let detail_url = format!("{}/api/v1/packages/{}", REGISTRY_URL, package_name);
-        let detail_response = client.get(&detail_url).send().expect("Detail request failed");
+        let detail_response = client
+            .get(&detail_url)
+            .send()
+            .expect("Detail request failed");
         let detail_data: PackageDetailResponse =
             detail_response.json().expect("Failed to parse detail");
 
@@ -301,7 +297,10 @@ mod version_details {
         let data: VersionDetailResponse = response.json().expect("Failed to parse response");
         assert_eq!(data.version, *version);
         assert!(!data.checksum.is_empty(), "Checksum should not be empty");
-        assert!(!data.tarball_url.is_empty(), "Tarball URL should not be empty");
+        assert!(
+            !data.tarball_url.is_empty(),
+            "Tarball URL should not be empty"
+        );
     }
 
     /// Test version details include dependencies if present

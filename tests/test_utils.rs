@@ -80,8 +80,7 @@ configuration = "Development"
 "#,
             registry_url
         );
-        fs::write(self.config_dir.join("config.toml"), config)
-            .expect("Failed to write config");
+        fs::write(self.config_dir.join("config.toml"), config).expect("Failed to write config");
     }
 
     /// Configure to use file-based registry
@@ -99,8 +98,7 @@ require_signatures = false
 "#,
             registry_path.display()
         );
-        fs::write(self.config_dir.join("config.toml"), config)
-            .expect("Failed to write config");
+        fs::write(self.config_dir.join("config.toml"), config).expect("Failed to write config");
     }
 
     /// Get path to the project directory
@@ -196,7 +194,8 @@ impl MockPlugin {
     }
 
     pub fn with_dependency(mut self, name: &str, version: &str) -> Self {
-        self.dependencies.push((name.to_string(), version.to_string()));
+        self.dependencies
+            .push((name.to_string(), version.to_string()));
         self
     }
 
@@ -391,11 +390,7 @@ pub mod assertions {
 
     /// Assert directory does not exist
     pub fn dir_not_exists(path: &Path) {
-        assert!(
-            !path.exists(),
-            "Directory should not exist: {:?}",
-            path
-        );
+        assert!(!path.exists(), "Directory should not exist: {:?}", path);
     }
 
     /// Assert file exists

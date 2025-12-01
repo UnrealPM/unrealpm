@@ -171,9 +171,7 @@ pub struct AuthConfig {
 
 impl Default for AuthConfig {
     fn default() -> Self {
-        Self {
-            token: None,
-        }
+        Self { token: None }
     }
 }
 

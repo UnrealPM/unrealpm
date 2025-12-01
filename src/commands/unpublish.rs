@@ -25,7 +25,10 @@ pub fn run(package: String, version: Option<String>) -> Result<()> {
         println!("  This will PERMANENTLY DELETE this version from the registry.");
         println!("  Users will no longer be able to install it.");
     } else {
-        println!("⚠ You are about to unpublish ALL versions of {}", package_name);
+        println!(
+            "⚠ You are about to unpublish ALL versions of {}",
+            package_name
+        );
         println!("  This will PERMANENTLY DELETE the entire package from the registry.");
         println!("  This action CANNOT be undone!");
     }
@@ -58,7 +61,10 @@ pub fn run(package: String, version: Option<String>) -> Result<()> {
     if let Some(v) = version_to_unpublish {
         println!("✓ Successfully unpublished {}@{}", package_name, v);
     } else {
-        println!("✓ Successfully unpublished all versions of {}", package_name);
+        println!(
+            "✓ Successfully unpublished all versions of {}",
+            package_name
+        );
     }
 
     Ok(())

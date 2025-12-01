@@ -62,7 +62,10 @@ pub fn run() -> Result<()> {
     }
 
     // Validate username (alphanumeric, dash, underscore only)
-    if !username.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
+    if !username
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+    {
         anyhow::bail!("Username can only contain letters, numbers, dashes, and underscores");
     }
 
@@ -83,8 +86,7 @@ pub fn run() -> Result<()> {
     }
 
     // Prompt for password (securely)
-    let password = rpassword::prompt_password("Password: ")
-        .context("Failed to read password")?;
+    let password = rpassword::prompt_password("Password: ").context("Failed to read password")?;
 
     if password.is_empty() {
         anyhow::bail!("Password cannot be empty");
@@ -124,7 +126,8 @@ pub fn run() -> Result<()> {
     let status = response.status();
 
     if status.is_success() {
-        let register_response: RegisterResponse = response.json()
+        let register_response: RegisterResponse = response
+            .json()
             .context("Failed to parse registration response")?;
 
         println!("✓ Registration successful!");
@@ -148,20 +151,24 @@ pub fn run() -> Result<()> {
             .context("Failed to login after registration")?;
 
         if login_response.status().is_success() {
-            let login_data: LoginResponse = login_response.json()
+            let login_data: LoginResponse = login_response
+                .json()
                 .context("Failed to parse login response")?;
 
             // Save token to config
             config.auth.token = Some(login_data.token);
-            config.save()
+            config
+                .save()
                 .context("Failed to save authentication token to config")?;
 
             println!("✓ Logged in successfully!");
             println!();
             println!("Your authentication token has been saved to ~/.unrealpm/config.toml");
-            println!("Token expires in {} seconds (~{} hours)",
+            println!(
+                "Token expires in {} seconds (~{} hours)",
                 login_data.expires_in,
-                login_data.expires_in / 3600);
+                login_data.expires_in / 3600
+            );
         } else {
             println!("⚠ Registration successful, but auto-login failed.");
             println!("  Please run: unrealpm login");
@@ -180,7 +187,11 @@ pub fn run() -> Result<()> {
         let error_msg = if let Ok(error_response) = response.json::<ErrorResponse>() {
             error_response.error
         } else {
-            format!("HTTP {}: {}", status.as_u16(), status.canonical_reason().unwrap_or("Unknown error"))
+            format!(
+                "HTTP {}: {}",
+                status.as_u16(),
+                status.canonical_reason().unwrap_or("Unknown error")
+            )
         };
 
         println!("✗ Registration failed: {}", error_msg);

@@ -1,13 +1,13 @@
 use anyhow::Result;
+use chrono::Utc;
+use flate2::write::GzEncoder;
+use flate2::Compression;
+use sha2::{Digest, Sha256};
 use std::env;
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
-use unrealpm::{Config, PackageMetadata, PackageType, PackageVersion, RegistryClient, UPlugin};
 use unrealpm::signing::load_or_generate_keys;
-use flate2::write::GzEncoder;
-use flate2::Compression;
-use sha2::{Sha256, Digest};
-use chrono::Utc;
+use unrealpm::{Config, PackageMetadata, PackageType, PackageVersion, RegistryClient, UPlugin};
 
 pub fn run(
     path: Option<String>,
@@ -21,28 +21,34 @@ pub fn run(
     println!();
 
     // Parse target engine version if provided
-    let (engine_major, engine_minor, engine_patch, is_multi_engine) = if let Some(ref eng) = target_engine {
-        // Parse engine version (e.g., "5.3", "4.27", "5.4.2")
-        let parts: Vec<&str> = eng.split('.').collect();
-        let major = parts.get(0)
-            .and_then(|s| s.parse::<i32>().ok())
-            .ok_or_else(|| anyhow::anyhow!("Invalid engine version format. Use: 4.27, 5.3, etc."))?;
-        let minor = parts.get(1)
-            .and_then(|s| s.parse::<i32>().ok())
-            .unwrap_or(0);
-        let patch = parts.get(2)
-            .and_then(|s| s.parse::<i32>().ok())
-            .unwrap_or(0);
+    let (engine_major, engine_minor, engine_patch, is_multi_engine) =
+        if let Some(ref eng) = target_engine {
+            // Parse engine version (e.g., "5.3", "4.27", "5.4.2")
+            let parts: Vec<&str> = eng.split('.').collect();
+            let major = parts
+                .get(0)
+                .and_then(|s| s.parse::<i32>().ok())
+                .ok_or_else(|| {
+                    anyhow::anyhow!("Invalid engine version format. Use: 4.27, 5.3, etc.")
+                })?;
+            let minor = parts
+                .get(1)
+                .and_then(|s| s.parse::<i32>().ok())
+                .unwrap_or(0);
+            let patch = parts
+                .get(2)
+                .and_then(|s| s.parse::<i32>().ok())
+                .unwrap_or(0);
 
-        println!("  Target engine: UE {}.{}.{}", major, minor, patch);
-        println!("  Publishing engine-specific version");
-        println!();
+            println!("  Target engine: UE {}.{}.{}", major, minor, patch);
+            println!("  Publishing engine-specific version");
+            println!();
 
-        (Some(major), Some(minor), Some(patch), false)
-    } else {
-        // Multi-engine version (current behavior)
-        (None, None, None, true)
-    };
+            (Some(major), Some(minor), Some(patch), false)
+        } else {
+            // Multi-engine version (current behavior)
+            (None, None, None, true)
+        };
 
     // Determine plugin directory
     let plugin_dir = if let Some(p) = path {
@@ -203,7 +209,10 @@ pub fn run(
 
             println!("  ✓ Published to HTTP registry");
             println!();
-            println!("✓ Successfully published {}@{}", plugin_name, uplugin.version_name);
+            println!(
+                "✓ Successfully published {}@{}",
+                plugin_name, uplugin.version_name
+            );
             println!();
             println!("Install with:");
             println!("  unrealpm install {}", plugin_name);
@@ -229,8 +238,10 @@ pub fn run(
         println!("  Signing package...");
 
         // Expand tilde in paths
-        let private_key_path = PathBuf::from(shellexpand::tilde(&config.signing.private_key_path).to_string());
-        let public_key_path = PathBuf::from(shellexpand::tilde(&config.signing.public_key_path).to_string());
+        let private_key_path =
+            PathBuf::from(shellexpand::tilde(&config.signing.private_key_path).to_string());
+        let public_key_path =
+            PathBuf::from(shellexpand::tilde(&config.signing.public_key_path).to_string());
 
         // Load or generate keys
         let keys = load_or_generate_keys(&private_key_path, &public_key_path)?;
@@ -302,10 +313,16 @@ pub fn run(
         dependencies: if uplugin.plugins.is_empty() {
             None
         } else {
-            Some(uplugin.plugins.iter().map(|p| unrealpm::Dependency {
-                name: p.name.clone(),
-                version: "*".to_string(), // Default to any version
-            }).collect())
+            Some(
+                uplugin
+                    .plugins
+                    .iter()
+                    .map(|p| unrealpm::Dependency {
+                        name: p.name.clone(),
+                        version: "*".to_string(), // Default to any version
+                    })
+                    .collect(),
+            )
         },
         public_key: public_key_hex,
         signed_at,
@@ -323,7 +340,10 @@ pub fn run(
     // Clean up temp directory
     fs::remove_dir_all(&temp_dir)?;
 
-    println!("✓ Successfully published {}@{}", plugin_name, uplugin.version_name);
+    println!(
+        "✓ Successfully published {}@{}",
+        plugin_name, uplugin.version_name
+    );
     println!();
     println!("Install with:");
     println!("  unrealpm install {}", plugin_name);
@@ -338,7 +358,8 @@ fn create_tarball(source_dir: &Path, output_path: &Path, include_binaries: bool)
     let mut tar = tar::Builder::new(enc);
 
     // Get the plugin name from the source directory
-    let plugin_name = source_dir.file_name()
+    let plugin_name = source_dir
+        .file_name()
         .and_then(|n| n.to_str())
         .ok_or_else(|| anyhow::anyhow!("Could not determine plugin name"))?;
 
@@ -424,8 +445,10 @@ fn publish_to_http(
     let (public_key, signed_at, signature_path) = if config.signing.enabled {
         println!("  Signing package...");
 
-        let private_key_path = PathBuf::from(shellexpand::tilde(&config.signing.private_key_path).to_string());
-        let public_key_path = PathBuf::from(shellexpand::tilde(&config.signing.public_key_path).to_string());
+        let private_key_path =
+            PathBuf::from(shellexpand::tilde(&config.signing.private_key_path).to_string());
+        let public_key_path =
+            PathBuf::from(shellexpand::tilde(&config.signing.public_key_path).to_string());
 
         let keys = unrealpm::load_or_generate_keys(&private_key_path, &public_key_path)?;
         let tarball_bytes = fs::read(tarball_path)?;
@@ -461,12 +484,16 @@ fn publish_to_http(
         dependencies: if uplugin.plugins.is_empty() {
             None
         } else {
-            Some(uplugin.plugins.iter().map(|p| {
-                unrealpm::registry_http::DependencySpec {
-                    name: p.name.clone(),
-                    version: "*".to_string(),
-                }
-            }).collect())
+            Some(
+                uplugin
+                    .plugins
+                    .iter()
+                    .map(|p| unrealpm::registry_http::DependencySpec {
+                        name: p.name.clone(),
+                        version: "*".to_string(),
+                    })
+                    .collect(),
+            )
         },
         public_key,
         signed_at,

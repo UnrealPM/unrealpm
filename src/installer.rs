@@ -183,10 +183,7 @@ fn find_extracted_plugin_dir(plugins_dir: &Path, package_name: &str) -> Result<P
 }
 
 /// Verify package checksum using SHA256
-pub fn verify_checksum<P: AsRef<Path>>(
-    tarball_path: P,
-    expected_checksum: &str,
-) -> Result<()> {
+pub fn verify_checksum<P: AsRef<Path>>(tarball_path: P, expected_checksum: &str) -> Result<()> {
     let tarball_path = tarball_path.as_ref();
 
     if expected_checksum.is_empty() {

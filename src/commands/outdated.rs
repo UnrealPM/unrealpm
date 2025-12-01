@@ -66,17 +66,23 @@ pub fn run() -> Result<()> {
         };
 
         // Find latest matching version
-        let latest_version = match find_matching_version(&metadata, constraint, engine_version, false) {
-            Ok(ver) => ver,
-            Err(e) => {
-                eprintln!("  ✗ Failed to resolve version for '{}': {}", name, e);
-                continue;
-            }
-        };
+        let latest_version =
+            match find_matching_version(&metadata, constraint, engine_version, false) {
+                Ok(ver) => ver,
+                Err(e) => {
+                    eprintln!("  ✗ Failed to resolve version for '{}': {}", name, e);
+                    continue;
+                }
+            };
 
         // Compare versions
         if current_version != &latest_version.version {
-            outdated_packages.push((name.clone(), current_version.clone(), latest_version.version.clone(), constraint.clone()));
+            outdated_packages.push((
+                name.clone(),
+                current_version.clone(),
+                latest_version.version.clone(),
+                constraint.clone(),
+            ));
         }
     }
 
@@ -91,10 +97,7 @@ pub fn run() -> Result<()> {
         // Print table header
         println!(
             "{:<30} {:<15} {:<15} {:<20}",
-            "Package",
-            "Current",
-            "Latest",
-            "Constraint"
+            "Package", "Current", "Latest", "Constraint"
         );
         println!("{}", "-".repeat(80));
 
@@ -102,10 +105,7 @@ pub fn run() -> Result<()> {
         for (name, current, latest, constraint) in outdated_packages {
             println!(
                 "{:<30} {:<15} {:<15} {:<20}",
-                name,
-                current,
-                latest,
-                constraint
+                name, current, latest, constraint
             );
         }
 

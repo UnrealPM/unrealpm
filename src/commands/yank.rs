@@ -71,7 +71,10 @@ pub fn run(package: String, unyank: bool) -> Result<()> {
         println!("✓ Successfully yanked {}@{}", package_name, version);
         println!("  This version can no longer be installed by new projects.");
         println!();
-        println!("To reverse this: unrealpm unyank {}@{}", package_name, version);
+        println!(
+            "To reverse this: unrealpm unyank {}@{}",
+            package_name, version
+        );
     }
 
     Ok(())

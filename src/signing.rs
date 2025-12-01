@@ -30,11 +30,10 @@ impl PackageSigningKey {
     /// Load keypair from PEM files
     pub fn load_from_files(private_path: &Path, public_path: &Path) -> Result<Self> {
         // Read private key
-        let private_pem = std::fs::read_to_string(private_path)
-            .context("Failed to read private key file")?;
+        let private_pem =
+            std::fs::read_to_string(private_path).context("Failed to read private key file")?;
 
-        let private_parsed = pem::parse(&private_pem)
-            .context("Failed to parse private key PEM")?;
+        let private_parsed = pem::parse(&private_pem).context("Failed to parse private key PEM")?;
 
         if private_parsed.contents().len() != 32 {
             anyhow::bail!("Invalid private key length (expected 32 bytes)");
@@ -48,11 +47,10 @@ impl PackageSigningKey {
         );
 
         // Read public key
-        let public_pem = std::fs::read_to_string(public_path)
-            .context("Failed to read public key file")?;
+        let public_pem =
+            std::fs::read_to_string(public_path).context("Failed to read public key file")?;
 
-        let public_parsed = pem::parse(&public_pem)
-            .context("Failed to parse public key PEM")?;
+        let public_parsed = pem::parse(&public_pem).context("Failed to parse public key PEM")?;
 
         if public_parsed.contents().len() != 32 {
             anyhow::bail!("Invalid public key length (expected 32 bytes)");
@@ -76,15 +74,13 @@ impl PackageSigningKey {
     pub fn save_to_files(&self, private_path: &Path, public_path: &Path) -> Result<()> {
         // Ensure parent directories exist
         if let Some(parent) = private_path.parent() {
-            std::fs::create_dir_all(parent)
-                .context("Failed to create keys directory")?;
+            std::fs::create_dir_all(parent).context("Failed to create keys directory")?;
         }
 
         // Save private key
         let private_pem = pem::Pem::new("PRIVATE KEY", self.signing_key.to_bytes());
         let private_encoded = pem::encode(&private_pem);
-        std::fs::write(private_path, private_encoded)
-            .context("Failed to write private key")?;
+        std::fs::write(private_path, private_encoded).context("Failed to write private key")?;
 
         // Set strict permissions on private key (Unix only)
         #[cfg(unix)]
@@ -99,8 +95,7 @@ impl PackageSigningKey {
         // Save public key
         let public_pem = pem::Pem::new("PUBLIC KEY", self.verifying_key.to_bytes());
         let public_encoded = pem::encode(&public_pem);
-        std::fs::write(public_path, public_encoded)
-            .context("Failed to write public key")?;
+        std::fs::write(public_path, public_encoded).context("Failed to write public key")?;
 
         Ok(())
     }
@@ -122,17 +117,16 @@ impl PackageSigningKey {
 }
 
 /// Verify a signature against data using a public key (hex-encoded)
-pub fn verify_signature(
-    data: &[u8],
-    signature_bytes: &[u8],
-    public_key_hex: &str,
-) -> Result<bool> {
+pub fn verify_signature(data: &[u8], signature_bytes: &[u8], public_key_hex: &str) -> Result<bool> {
     // Decode public key from hex
-    let public_key_bytes = hex::decode(public_key_hex)
-        .context("Failed to decode public key from hex")?;
+    let public_key_bytes =
+        hex::decode(public_key_hex).context("Failed to decode public key from hex")?;
 
     if public_key_bytes.len() != 32 {
-        anyhow::bail!("Invalid public key length (expected 32 bytes, got {})", public_key_bytes.len());
+        anyhow::bail!(
+            "Invalid public key length (expected 32 bytes, got {})",
+            public_key_bytes.len()
+        );
     }
 
     let verifying_key = VerifyingKey::from_bytes(
@@ -145,7 +139,10 @@ pub fn verify_signature(
 
     // Parse signature
     if signature_bytes.len() != 64 {
-        anyhow::bail!("Invalid signature length (expected 64 bytes, got {})", signature_bytes.len());
+        anyhow::bail!(
+            "Invalid signature length (expected 64 bytes, got {})",
+            signature_bytes.len()
+        );
     }
 
     let signature = Signature::from_bytes(
@@ -213,7 +210,8 @@ mod tests {
         let signature = keys.sign(data);
 
         // Verify
-        let is_valid = verify_signature(data, &signature.to_bytes(), &keys.public_key_hex()).unwrap();
+        let is_valid =
+            verify_signature(data, &signature.to_bytes(), &keys.public_key_hex()).unwrap();
         assert!(is_valid);
     }
 
@@ -227,7 +225,8 @@ mod tests {
         let tampered_data = b"Hello, UnrealPM!!!";
 
         // Verify should fail
-        let is_valid = verify_signature(tampered_data, &signature.to_bytes(), &keys.public_key_hex()).unwrap();
+        let is_valid =
+            verify_signature(tampered_data, &signature.to_bytes(), &keys.public_key_hex()).unwrap();
         assert!(!is_valid);
     }
 
@@ -239,7 +238,9 @@ mod tests {
 
         // Generate and save
         let original_keys = PackageSigningKey::generate().unwrap();
-        original_keys.save_to_files(&private_path, &public_path).unwrap();
+        original_keys
+            .save_to_files(&private_path, &public_path)
+            .unwrap();
 
         // Load
         let loaded_keys = PackageSigningKey::load_from_files(&private_path, &public_path).unwrap();
@@ -262,7 +263,8 @@ mod tests {
         let tampered_data = b"Tampered file content";
 
         // Verification should fail
-        let is_valid = verify_signature(tampered_data, &signature.to_bytes(), &keys.public_key_hex()).unwrap();
+        let is_valid =
+            verify_signature(tampered_data, &signature.to_bytes(), &keys.public_key_hex()).unwrap();
         assert!(!is_valid);
     }
 }

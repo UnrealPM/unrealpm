@@ -114,7 +114,10 @@ pub fn run(package: String) -> Result<()> {
                         if i == 0 {
                             // Root of chain (direct dependency)
                             if let Some(constraint) = manifest.dependencies.get(pkg_name) {
-                                println!("{}{}{}@{} ({})", indent, arrow, pkg_name, pkg.version, constraint);
+                                println!(
+                                    "{}{}{}@{} ({})",
+                                    indent, arrow, pkg_name, pkg.version, constraint
+                                );
                             }
                         } else if i == path.len() - 1 {
                             // Target package

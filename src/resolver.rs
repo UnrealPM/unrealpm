@@ -58,8 +58,12 @@ pub fn find_matching_version(
     force: bool,
 ) -> Result<PackageVersion> {
     // Parse the version requirement
-    let req = VersionReq::parse(constraint)
-        .map_err(|e| Error::Other(format!("Invalid version constraint '{}': {}", constraint, e)))?;
+    let req = VersionReq::parse(constraint).map_err(|e| {
+        Error::Other(format!(
+            "Invalid version constraint '{}': {}",
+            constraint, e
+        ))
+    })?;
 
     // Find all matching versions
     let mut matching_versions: Vec<_> = package_metadata
@@ -95,9 +99,12 @@ pub fn find_matching_version(
                     // Check engine-specific version
                     if !pkg_ver.is_multi_engine {
                         // Engine-specific: Must match major.minor
-                        if let (Some(pkg_major), Some(pkg_minor), Some(rm), Some(rmi)) =
-                            (pkg_ver.engine_major, pkg_ver.engine_minor, req_major, req_minor)
-                        {
+                        if let (Some(pkg_major), Some(pkg_minor), Some(rm), Some(rmi)) = (
+                            pkg_ver.engine_major,
+                            pkg_ver.engine_minor,
+                            req_major,
+                            req_minor,
+                        ) {
                             matches = pkg_major == rm && pkg_minor == rmi;
                         }
                     } else {
@@ -178,9 +185,9 @@ pub fn find_matching_version(
     matching_versions.sort_by(|a, b| {
         // Prefer engine-specific over multi-engine
         match (a.1.is_multi_engine, b.1.is_multi_engine) {
-            (false, true) => std::cmp::Ordering::Less,  // a is engine-specific, prefer it
+            (false, true) => std::cmp::Ordering::Less, // a is engine-specific, prefer it
             (true, false) => std::cmp::Ordering::Greater, // b is engine-specific, prefer it
-            _ => b.0.cmp(&a.0), // Same type, use version (highest first)
+            _ => b.0.cmp(&a.0),                        // Same type, use version (highest first)
         }
     });
 
@@ -232,7 +239,8 @@ pub fn resolve_dependencies(
         let metadata = registry.get_package(&package_name)?;
 
         // Find matching version with engine filtering
-        let resolved_version = find_matching_version(&metadata, &version_constraint, engine_version, force)?;
+        let resolved_version =
+            find_matching_version(&metadata, &version_constraint, engine_version, force)?;
 
         // Add transitive dependencies to the queue
         if let Some(deps) = &resolved_version.dependencies {

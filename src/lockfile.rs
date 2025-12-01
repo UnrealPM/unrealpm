@@ -105,9 +105,8 @@ impl Lockfile {
         }
 
         let contents = fs::read_to_string(path)?;
-        let lockfile: Lockfile = toml::from_str(&contents).map_err(|e| {
-            Error::Other(format!("Failed to parse lockfile: {}", e))
-        })?;
+        let lockfile: Lockfile = toml::from_str(&contents)
+            .map_err(|e| Error::Other(format!("Failed to parse lockfile: {}", e)))?;
 
         Ok(Some(lockfile))
     }
@@ -189,7 +188,10 @@ mod tests {
     fn test_lockfile_new() {
         let lockfile = Lockfile::new();
         assert_eq!(lockfile.packages.len(), 0);
-        assert_eq!(lockfile.metadata.unrealpm_version, env!("CARGO_PKG_VERSION"));
+        assert_eq!(
+            lockfile.metadata.unrealpm_version,
+            env!("CARGO_PKG_VERSION")
+        );
     }
 
     #[test]

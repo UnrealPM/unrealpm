@@ -57,22 +57,24 @@ pub fn run(
     };
 
     // Find engine installation
-    let engine_install = config
-        .find_engine(&engine_version)
-        .ok_or_else(|| {
-            anyhow::anyhow!(
-                "Unreal Engine {} not found in configuration.\n\n\
+    let engine_install = config.find_engine(&engine_version).ok_or_else(|| {
+        anyhow::anyhow!(
+            "Unreal Engine {} not found in configuration.\n\n\
                 Configure it with:\n\
                   unrealpm config add-engine {} /path/to/UE_{}\n\n\
                 Example:\n\
                   unrealpm config add-engine 5.3 C:\\Program Files\\Epic Games\\UE_5.3",
-                engine_version,
-                engine_version,
-                engine_version
-            )
-        })?;
+            engine_version,
+            engine_version,
+            engine_version
+        )
+    })?;
 
-    println!("  Using Unreal Engine: {} at {}", engine_version, engine_install.path.display());
+    println!(
+        "  Using Unreal Engine: {} at {}",
+        engine_version,
+        engine_install.path.display()
+    );
     println!();
 
     // Determine platforms to build
@@ -90,12 +92,19 @@ pub fn run(
     // Build for each platform
     for target_platform in &platforms {
         println!("Building for {}...", target_platform);
-        build_for_platform(&plugin_dir, &plugin_name, &engine_version, target_platform, &config)?;
+        build_for_platform(
+            &plugin_dir,
+            &plugin_name,
+            &engine_version,
+            target_platform,
+            &config,
+        )?;
         println!("  ✓ Built for {}", target_platform);
         println!();
     }
 
-    println!("✓ Successfully built {} for {} platform{}",
+    println!(
+        "✓ Successfully built {} for {} platform{}",
         plugin_name,
         platforms.len(),
         if platforms.len() == 1 { "" } else { "s" }
@@ -134,7 +143,13 @@ pub fn build_for_platform(
             )
         })?;
 
-    build_plugin(plugin_dir, plugin_name, &engine_install.path, platform, &config.build.configuration)
+    build_plugin(
+        plugin_dir,
+        plugin_name,
+        &engine_install.path,
+        platform,
+        &config.build.configuration,
+    )
 }
 
 fn build_plugin(
@@ -187,7 +202,10 @@ fn build_plugin(
 
     cmd.arg("BuildPlugin");
     cmd.arg(format!("-Plugin={}", plugin_path_arg));
-    cmd.arg(format!("-Package={}", plugin_path_arg.replace(".uplugin", "")));
+    cmd.arg(format!(
+        "-Package={}",
+        plugin_path_arg.replace(".uplugin", "")
+    ));
     cmd.arg(format!("-TargetPlatforms={}", platform));
     cmd.arg(format!("-TargetConfigurations={}", configuration));
 
@@ -209,8 +227,8 @@ fn build_plugin(
     let start_time = Instant::now();
 
     // Spawn the process and capture output line by line
-    use std::process::Stdio;
     use std::io::{BufRead, BufReader};
+    use std::process::Stdio;
 
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());
@@ -267,11 +285,7 @@ fn build_plugin(
             println!();
         }
 
-        anyhow::bail!(
-            "Build failed for {} on {}",
-            plugin_name,
-            platform
-        );
+        anyhow::bail!("Build failed for {} on {}", plugin_name, platform);
     }
 
     let elapsed = start_time.elapsed();
@@ -377,7 +391,10 @@ fn create_temp_project(_plugin_dir: &Path, plugin_name: &str, _platform: &str) -
         ]
     });
 
-    fs::write(&uproject_path, serde_json::to_string_pretty(&uproject_content)?)?;
+    fs::write(
+        &uproject_path,
+        serde_json::to_string_pretty(&uproject_content)?,
+    )?;
 
     Ok(uproject_path)
 }

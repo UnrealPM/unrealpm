@@ -270,9 +270,23 @@ fn main() {
 
     let result = match cli.command {
         Commands::Init => commands::init::run(),
-        Commands::Install { package, force, engine_version, prefer_binary, source_only, binary_only, dry_run } => {
-            commands::install::run(package, force, engine_version, prefer_binary, source_only, binary_only, dry_run)
-        }
+        Commands::Install {
+            package,
+            force,
+            engine_version,
+            prefer_binary,
+            source_only,
+            binary_only,
+            dry_run,
+        } => commands::install::run(
+            package,
+            force,
+            engine_version,
+            prefer_binary,
+            source_only,
+            binary_only,
+            dry_run,
+        ),
         Commands::Uninstall { package } => commands::uninstall::run(package),
         Commands::Update { package, dry_run } => commands::update::run(package, dry_run),
         Commands::List => commands::list::run(),
@@ -280,12 +294,20 @@ fn main() {
         Commands::Tree => commands::tree::run(),
         Commands::Why { package } => commands::why::run(package),
         Commands::Search { query } => commands::search::run(query),
-        Commands::Publish { path, dry_run, include_binaries, engine, git_repo, git_ref } => {
-            commands::publish::run(path, dry_run, include_binaries, engine, git_repo, git_ref)
-        }
-        Commands::Build { path, engine, platform, all_platforms } => {
-            commands::build::run(path, engine, platform, all_platforms)
-        }
+        Commands::Publish {
+            path,
+            dry_run,
+            include_binaries,
+            engine,
+            git_repo,
+            git_ref,
+        } => commands::publish::run(path, dry_run, include_binaries, engine, git_repo, git_ref),
+        Commands::Build {
+            path,
+            engine,
+            platform,
+            all_platforms,
+        } => commands::build::run(path, engine, platform, all_platforms),
         Commands::Config { action } => commands::config::run(&action),
         Commands::Keys { action } => commands::keys::run(&action),
         Commands::Verify { package } => commands::verify::run(package),
@@ -296,7 +318,11 @@ fn main() {
         Commands::Yank { package } => commands::yank::run(package, false),
         Commands::Unyank { package } => commands::yank::run(package, true),
         Commands::Tokens { action } => match action {
-            TokensAction::Create { name, scopes, expires } => commands::tokens::run_create(name, scopes, expires),
+            TokensAction::Create {
+                name,
+                scopes,
+                expires,
+            } => commands::tokens::run_create(name, scopes, expires),
             TokensAction::List => commands::tokens::run_list(),
             TokensAction::Revoke { token_id } => commands::tokens::run_revoke(token_id),
         },

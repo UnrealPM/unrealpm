@@ -48,7 +48,10 @@ pub fn run_create(name: String, scopes: Vec<String>, expires_days: Option<i64>) 
     }
 
     // Check we're logged in
-    let auth_token = config.auth.token.as_ref()
+    let auth_token = config
+        .auth
+        .token
+        .as_ref()
         .ok_or_else(|| anyhow::anyhow!("Not logged in. Run: unrealpm login"))?;
 
     // Default scopes if none provided
@@ -76,12 +79,14 @@ pub fn run_create(name: String, scopes: Vec<String>, expires_days: Option<i64>) 
         .context("Failed to create token")?;
 
     if !response.status().is_success() {
-        let error_text = response.text().unwrap_or_else(|_| "Unknown error".to_string());
+        let error_text = response
+            .text()
+            .unwrap_or_else(|_| "Unknown error".to_string());
         anyhow::bail!("Failed to create token: {}", error_text);
     }
 
-    let token_response: CreateTokenResponse = response.json()
-        .context("Failed to parse response")?;
+    let token_response: CreateTokenResponse =
+        response.json().context("Failed to parse response")?;
 
     println!("✓ Token created successfully!");
     println!();
@@ -98,7 +103,10 @@ pub fn run_create(name: String, scopes: Vec<String>, expires_days: Option<i64>) 
     println!("  {}", token_response.token);
     println!();
     println!("To use this token:");
-    println!("  unrealpm config set auth.token \"{}\"", token_response.token);
+    println!(
+        "  unrealpm config set auth.token \"{}\"",
+        token_response.token
+    );
     println!();
     println!("Or set environment variable:");
     println!("  export UNREALPM_TOKEN=\"{}\"", token_response.token);
@@ -118,7 +126,10 @@ pub fn run_list() -> Result<()> {
     }
 
     // Check we're logged in
-    let auth_token = config.auth.token.as_ref()
+    let auth_token = config
+        .auth
+        .token
+        .as_ref()
         .ok_or_else(|| anyhow::anyhow!("Not logged in. Run: unrealpm login"))?;
 
     // Send request
@@ -135,8 +146,7 @@ pub fn run_list() -> Result<()> {
         anyhow::bail!("Failed to list tokens: HTTP {}", response.status().as_u16());
     }
 
-    let token_list: TokenListResponse = response.json()
-        .context("Failed to parse response")?;
+    let token_list: TokenListResponse = response.json().context("Failed to parse response")?;
 
     if token_list.tokens.is_empty() {
         println!("No API tokens found.");
@@ -155,7 +165,8 @@ pub fn run_list() -> Result<()> {
             "Active (permanent)"
         };
 
-        println!("│ {:<30} │ {:<15} │",
+        println!(
+            "│ {:<30} │ {:<15} │",
             token.name.as_deref().unwrap_or("Unnamed"),
             status
         );
@@ -187,7 +198,10 @@ pub fn run_revoke(token_id: String) -> Result<()> {
     }
 
     // Check we're logged in
-    let auth_token = config.auth.token.as_ref()
+    let auth_token = config
+        .auth
+        .token
+        .as_ref()
         .ok_or_else(|| anyhow::anyhow!("Not logged in. Run: unrealpm login"))?;
 
     // Confirm
@@ -213,7 +227,10 @@ pub fn run_revoke(token_id: String) -> Result<()> {
         .context("Failed to revoke token")?;
 
     if !response.status().is_success() {
-        anyhow::bail!("Failed to revoke token: HTTP {}", response.status().as_u16());
+        anyhow::bail!(
+            "Failed to revoke token: HTTP {}",
+            response.status().as_u16()
+        );
     }
 
     println!("✓ Token revoked successfully");

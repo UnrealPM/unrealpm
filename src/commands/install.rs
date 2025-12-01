@@ -1,10 +1,10 @@
 use anyhow::Result;
 use indicatif::{ProgressBar, ProgressStyle};
-use unrealpm::{
-    find_matching_version, install_package, resolve_dependencies, verify_checksum, verify_signature, Config, Lockfile,
-    Manifest, PrebuiltBinary, RegistryClient,
-};
 use std::env;
+use unrealpm::{
+    find_matching_version, install_package, resolve_dependencies, verify_checksum,
+    verify_signature, Config, Lockfile, Manifest, PrebuiltBinary, RegistryClient,
+};
 
 pub fn run(
     package: Option<String>,
@@ -29,17 +29,30 @@ pub fn run(
     };
 
     match package {
-        Some(pkg) => install_single_package(&pkg, &current_dir, force, engine_version_override, install_mode, dry_run),
-        None => install_all_dependencies(&current_dir, force, engine_version_override, install_mode, dry_run),
+        Some(pkg) => install_single_package(
+            &pkg,
+            &current_dir,
+            force,
+            engine_version_override,
+            install_mode,
+            dry_run,
+        ),
+        None => install_all_dependencies(
+            &current_dir,
+            force,
+            engine_version_override,
+            install_mode,
+            dry_run,
+        ),
     }
 }
 
 #[derive(Debug, Clone, Copy)]
 enum InstallMode {
-    PreferSource,   // Default: use source, ignore binaries
-    PreferBinary,   // Try binary first, fall back to source
-    SourceOnly,     // Never use binaries
-    BinaryOnly,     // Require binary, fail if not available
+    PreferSource, // Default: use source, ignore binaries
+    PreferBinary, // Try binary first, fall back to source
+    SourceOnly,   // Never use binaries
+    BinaryOnly,   // Require binary, fail if not available
 }
 
 fn install_single_package(
@@ -59,7 +72,10 @@ fn install_single_package(
     };
 
     if dry_run {
-        println!("[DRY RUN] Would install {}@{}...", package_name, version_constraint);
+        println!(
+            "[DRY RUN] Would install {}@{}...",
+            package_name, version_constraint
+        );
     } else {
         println!("Installing {}@{}...", package_name, version_constraint);
     }
@@ -107,12 +123,16 @@ fn install_single_package(
     spinner.set_message("Resolving version...");
     spinner.enable_steady_tick(std::time::Duration::from_millis(80));
 
-    let resolved_version = find_matching_version(&metadata, &version_constraint, engine_version, force)?;
+    let resolved_version =
+        find_matching_version(&metadata, &version_constraint, engine_version, force)?;
 
     if force && engine_version.is_some() {
         println!("  ⚠ WARNING: Force installing - engine compatibility not checked");
     }
-    spinner.finish_with_message(format!("✓ Resolved to version {}", resolved_version.version));
+    spinner.finish_with_message(format!(
+        "✓ Resolved to version {}",
+        resolved_version.version
+    ));
 
     // Determine which tarball to use (binary or source)
     let (tarball_path, checksum, install_type) = select_installation_source(
@@ -133,20 +153,30 @@ fn install_single_package(
             println!("  [DRY RUN] Would verify signature");
         }
         println!("  [DRY RUN] Would verify checksum: {}", checksum);
-        println!("  [DRY RUN] Would install to: {}/Plugins/{}", project_dir.display(), package_name);
+        println!(
+            "  [DRY RUN] Would install to: {}/Plugins/{}",
+            project_dir.display(),
+            package_name
+        );
 
         // Check if auto-build would be triggered
         let config = Config::load()?;
         let was_source_install = install_type.as_ref().map_or(true, |t| t.contains("source"));
 
         if config.build.auto_build_on_install && was_source_install && engine_version.is_some() {
-            println!("  [DRY RUN] Would auto-build binaries for {}", unrealpm::detect_platform());
+            println!(
+                "  [DRY RUN] Would auto-build binaries for {}",
+                unrealpm::detect_platform()
+            );
         }
 
         println!("  [DRY RUN] Would update manifest (unrealpm.json)");
         println!("  [DRY RUN] Would update lockfile (unrealpm.lock)");
         println!();
-        println!("[DRY RUN] Would successfully install {}@{}", package_name, resolved_version.version);
+        println!(
+            "[DRY RUN] Would successfully install {}@{}",
+            package_name, resolved_version.version
+        );
         println!();
         return Ok(());
     }
@@ -192,7 +222,10 @@ fn install_single_package(
                     );
                 }
 
-                println!("  ✓ Signature verified (publisher: {}...)", &public_key[..16]);
+                println!(
+                    "  ✓ Signature verified (publisher: {}...)",
+                    &public_key[..16]
+                );
             }
             Err(_) => {
                 // Signature download failed or file missing
@@ -283,7 +316,10 @@ fn install_single_package(
     println!("  ✓ Lockfile updated");
 
     println!();
-    println!("✓ Successfully installed {}@{}", package_name, resolved_version.version);
+    println!(
+        "✓ Successfully installed {}@{}",
+        package_name, resolved_version.version
+    );
     println!();
 
     Ok(())
@@ -373,7 +409,10 @@ fn install_all_dependencies(
         println!();
         println!("[DRY RUN] Would update lockfile (unrealpm.lock)");
         println!();
-        println!("[DRY RUN] Would successfully install {} packages", resolved.len());
+        println!(
+            "[DRY RUN] Would successfully install {} packages",
+            resolved.len()
+        );
         println!();
         return Ok(());
     }
@@ -454,17 +493,23 @@ fn select_installation_source(
     let platform = unrealpm::platform::detect_platform();
 
     // Check for pre-built binary if requested
-    if matches!(install_mode, InstallMode::PreferBinary | InstallMode::BinaryOnly) {
+    if matches!(
+        install_mode,
+        InstallMode::PreferBinary | InstallMode::BinaryOnly
+    ) {
         if let Some(binaries) = &resolved_version.binaries {
             // Try to find matching binary
             if let Some(engine) = engine_version {
                 let normalized_engine = unrealpm::platform::normalize_engine_version(engine);
 
                 for binary in binaries {
-                    if binary.platform == platform &&
-                       unrealpm::platform::normalize_engine_version(&binary.engine) == normalized_engine {
+                    if binary.platform == platform
+                        && unrealpm::platform::normalize_engine_version(&binary.engine)
+                            == normalized_engine
+                    {
                         // Found matching binary!
-                        let binary_tarball_path = registry.get_tarball_path(package_name, &binary.tarball);
+                        let binary_tarball_path =
+                            registry.get_tarball_path(package_name, &binary.tarball);
                         return Ok((
                             binary_tarball_path,
                             binary.checksum.clone(),
@@ -493,8 +538,12 @@ fn select_installation_source(
     }
 
     // Fall back to source (or use source if preferred)
-    if matches!(install_mode, InstallMode::SourceOnly | InstallMode::PreferSource | InstallMode::PreferBinary) {
-        let source_tarball_path = registry.get_tarball_path(package_name, &resolved_version.version);
+    if matches!(
+        install_mode,
+        InstallMode::SourceOnly | InstallMode::PreferSource | InstallMode::PreferBinary
+    ) {
+        let source_tarball_path =
+            registry.get_tarball_path(package_name, &resolved_version.version);
         return Ok((
             source_tarball_path,
             resolved_version.checksum.clone(),

@@ -17,7 +17,11 @@ pub fn run(query: String) -> Result<()> {
         return Ok(());
     }
 
-    println!("Found {} package{}:", results.len(), if results.len() == 1 { "" } else { "s" });
+    println!(
+        "Found {} package{}:",
+        results.len(),
+        if results.len() == 1 { "" } else { "s" }
+    );
     for package_name in &results {
         // Try to get metadata to show description
         if let Ok(metadata) = registry.get_package(package_name) {

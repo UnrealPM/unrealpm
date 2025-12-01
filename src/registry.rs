@@ -240,7 +240,10 @@ impl RegistryClient {
 
 impl FileRegistryClient {
     pub fn get_package(&self, name: &str) -> Result<PackageMetadata> {
-        let package_file = self.registry_path.join("packages").join(format!("{}.json", name));
+        let package_file = self
+            .registry_path
+            .join("packages")
+            .join(format!("{}.json", name));
 
         if !package_file.exists() {
             // Try to find similar package names for suggestions
@@ -283,8 +286,10 @@ impl FileRegistryClient {
                 if path.extension().and_then(|s| s.to_str()) == Some("json") {
                     if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
                         // Simple similarity check: substring match or low edit distance
-                        if name.contains(query) || query.contains(name) ||
-                           self.levenshtein_distance(query, name) <= 3 {
+                        if name.contains(query)
+                            || query.contains(name)
+                            || self.levenshtein_distance(query, name) <= 3
+                        {
                             similar.push(name.to_string());
                         }
                     }
@@ -314,11 +319,8 @@ impl FileRegistryClient {
             for (j, c2) in s2.chars().enumerate() {
                 let cost = if c1 == c2 { 0 } else { 1 };
                 matrix[i + 1][j + 1] = std::cmp::min(
-                    std::cmp::min(
-                        matrix[i][j + 1] + 1,
-                        matrix[i + 1][j] + 1
-                    ),
-                    matrix[i][j] + cost
+                    std::cmp::min(matrix[i][j + 1] + 1, matrix[i + 1][j] + 1),
+                    matrix[i][j] + cost,
                 );
             }
         }

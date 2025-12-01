@@ -31,7 +31,8 @@ pub enum Error {
     #[error("Invalid manifest: {0}")]
     InvalidManifest(String),
 
-    #[error("No .uproject file found in current directory\n\n\
+    #[error(
+        "No .uproject file found in current directory\n\n\
              Hint: Make sure you're running this command from your Unreal Engine project root.\n\
              The project root should contain a .uproject file.\n\n\
              Example structure:\n\
@@ -40,7 +41,8 @@ pub enum Error {
              ├── Config/\n\
              ├── Content/\n\
              └── Source/\n\n\
-             Try: cd /path/to/your/project")]
+             Try: cd /path/to/your/project"
+    )]
     NoUProjectFile,
 
     #[error("Unreal Engine installation not found{}\n\n\
@@ -57,13 +59,15 @@ pub enum Error {
              .0)]
     EngineNotFound(String),
 
-    #[error("Dependency resolution failed: {0}\n\n\
+    #[error(
+        "Dependency resolution failed: {0}\n\n\
              Hint: This usually means conflicting version requirements.\n\n\
              Possible solutions:\n\
              1. Check your unrealpm.json for incompatible version constraints\n\
              2. Update package versions to compatible ranges\n\
              3. Use --force to bypass version checks (not recommended)\n\n\
-             Need help? Run: unrealpm list --verbose")]
+             Need help? Run: unrealpm list --verbose"
+    )]
     DependencyResolutionFailed(String),
 
     #[error("{0}")]

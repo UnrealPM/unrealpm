@@ -1,8 +1,8 @@
 use anyhow::Result;
 use std::env;
 use unrealpm::{
-    find_matching_version, install_package, resolve_dependencies, verify_checksum, Config, Lockfile,
-    Manifest, RegistryClient,
+    find_matching_version, install_package, resolve_dependencies, verify_checksum, Config,
+    Lockfile, Manifest, RegistryClient,
 };
 
 pub fn run(package: Option<String>, dry_run: bool) -> Result<()> {
@@ -14,7 +14,11 @@ pub fn run(package: Option<String>, dry_run: bool) -> Result<()> {
     }
 }
 
-fn update_single_package(package_name: &str, project_dir: &std::path::Path, dry_run: bool) -> Result<()> {
+fn update_single_package(
+    package_name: &str,
+    project_dir: &std::path::Path,
+    dry_run: bool,
+) -> Result<()> {
     if dry_run {
         println!("[DRY RUN] Would update package: {}", package_name);
     } else {
@@ -53,7 +57,8 @@ fn update_single_package(package_name: &str, project_dir: &std::path::Path, dry_
     let metadata = registry.get_package(package_name)?;
 
     // Find latest matching version
-    let resolved_version = find_matching_version(&metadata, version_constraint, engine_version, false)?;
+    let resolved_version =
+        find_matching_version(&metadata, version_constraint, engine_version, false)?;
     println!("  ✓ Latest matching version: {}", resolved_version.version);
 
     // Check if already at latest version
@@ -62,14 +67,23 @@ fn update_single_package(package_name: &str, project_dir: &std::path::Path, dry_
             if locked_pkg.version == resolved_version.version {
                 println!();
                 if dry_run {
-                    println!("[DRY RUN] {} is already at the latest version ({})", package_name, resolved_version.version);
+                    println!(
+                        "[DRY RUN] {} is already at the latest version ({})",
+                        package_name, resolved_version.version
+                    );
                 } else {
-                    println!("✓ {} is already at the latest version ({})", package_name, resolved_version.version);
+                    println!(
+                        "✓ {} is already at the latest version ({})",
+                        package_name, resolved_version.version
+                    );
                 }
                 println!();
                 return Ok(());
             }
-            println!("  Updating from {} to {}", locked_pkg.version, resolved_version.version);
+            println!(
+                "  Updating from {} to {}",
+                locked_pkg.version, resolved_version.version
+            );
             Some(locked_pkg.version.clone())
         } else {
             None
@@ -80,14 +94,27 @@ fn update_single_package(package_name: &str, project_dir: &std::path::Path, dry_
 
     if dry_run {
         // Dry run: show what would happen
-        println!("  [DRY RUN] Would verify checksum: {}", resolved_version.checksum);
+        println!(
+            "  [DRY RUN] Would verify checksum: {}",
+            resolved_version.checksum
+        );
         if let Some(cur_ver) = current_version {
-            println!("  [DRY RUN] Would update from {} to {}", cur_ver, resolved_version.version);
+            println!(
+                "  [DRY RUN] Would update from {} to {}",
+                cur_ver, resolved_version.version
+            );
         }
-        println!("  [DRY RUN] Would install to: {}/Plugins/{}", project_dir.display(), package_name);
+        println!(
+            "  [DRY RUN] Would install to: {}/Plugins/{}",
+            project_dir.display(),
+            package_name
+        );
         println!("  [DRY RUN] Would update lockfile (unrealpm.lock)");
         println!();
-        println!("[DRY RUN] Would successfully update {} to {}", package_name, resolved_version.version);
+        println!(
+            "[DRY RUN] Would successfully update {} to {}",
+            package_name, resolved_version.version
+        );
         println!();
         return Ok(());
     }
@@ -101,8 +128,7 @@ fn update_single_package(package_name: &str, project_dir: &std::path::Path, dry_
 
     // Install package (this will overwrite the existing installation)
     println!("  Installing updated version...");
-    let installed_path =
-        install_package(&tarball_path, &project_dir.to_path_buf(), package_name)?;
+    let installed_path = install_package(&tarball_path, &project_dir.to_path_buf(), package_name)?;
     println!("  ✓ Updated at {}", installed_path.display());
 
     // Update lockfile
@@ -122,7 +148,10 @@ fn update_single_package(package_name: &str, project_dir: &std::path::Path, dry_
     println!("  ✓ Lockfile updated");
 
     println!();
-    println!("✓ Successfully updated {} to {}", package_name, resolved_version.version);
+    println!(
+        "✓ Successfully updated {} to {}",
+        package_name, resolved_version.version
+    );
     println!();
 
     Ok(())
@@ -181,26 +210,52 @@ fn update_all_packages(project_dir: &std::path::Path, dry_run: bool) -> Result<(
         let is_update = if let Some(old_pkg) = old_lockfile.get_package(name) {
             if old_pkg.version == resolved_pkg.version {
                 if dry_run {
-                    println!("  {} already at latest version ({})", name, resolved_pkg.version);
+                    println!(
+                        "  {} already at latest version ({})",
+                        name, resolved_pkg.version
+                    );
                 } else {
-                    println!("  ✓ {} already at latest version ({})", name, resolved_pkg.version);
+                    println!(
+                        "  ✓ {} already at latest version ({})",
+                        name, resolved_pkg.version
+                    );
                 }
                 false
             } else {
                 if dry_run {
-                    println!("  [DRY RUN] Would update {}@{} -> {}", name, old_pkg.version, resolved_pkg.version);
-                    pending_updates.push((name.clone(), old_pkg.version.clone(), resolved_pkg.version.clone()));
+                    println!(
+                        "  [DRY RUN] Would update {}@{} -> {}",
+                        name, old_pkg.version, resolved_pkg.version
+                    );
+                    pending_updates.push((
+                        name.clone(),
+                        old_pkg.version.clone(),
+                        resolved_pkg.version.clone(),
+                    ));
                 } else {
-                    println!("  Updating {}@{} -> {}...", name, old_pkg.version, resolved_pkg.version);
+                    println!(
+                        "  Updating {}@{} -> {}...",
+                        name, old_pkg.version, resolved_pkg.version
+                    );
                 }
                 true
             }
         } else {
             if dry_run {
-                println!("  [DRY RUN] Would install new dependency {}@{}", name, resolved_pkg.version);
-                pending_updates.push((name.clone(), "none".to_string(), resolved_pkg.version.clone()));
+                println!(
+                    "  [DRY RUN] Would install new dependency {}@{}",
+                    name, resolved_pkg.version
+                );
+                pending_updates.push((
+                    name.clone(),
+                    "none".to_string(),
+                    resolved_pkg.version.clone(),
+                ));
             } else {
-                println!("  Installing new dependency {}@{}...", name, resolved_pkg.version);
+                println!(
+                    "  Installing new dependency {}@{}...",
+                    name, resolved_pkg.version
+                );
             }
             true
         };
