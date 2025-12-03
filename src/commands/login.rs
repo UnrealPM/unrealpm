@@ -10,14 +10,18 @@ use unrealpm::Config;
 struct LoginRequest {
     email: String,
     password: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    totp_code: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 struct LoginResponse {
     success: bool,
-    token: String,
-    expires_in: u64,
+    token: Option<String>,
+    expires_in: Option<u64>,
+    #[serde(default)]
+    requires_2fa: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -121,7 +125,12 @@ fn run_email_login() -> Result<()> {
     let client = reqwest::blocking::Client::new();
     let login_url = format!("{}/api/v1/auth/login", registry_url);
 
-    let request_body = LoginRequest { email, password };
+    // First attempt without TOTP code
+    let request_body = LoginRequest {
+        email: email.clone(),
+        password: password.clone(),
+        totp_code: None,
+    };
 
     let response = client
         .post(&login_url)
@@ -135,22 +144,109 @@ fn run_email_login() -> Result<()> {
         let login_response: LoginResponse =
             response.json().context("Failed to parse login response")?;
 
-        // Save token to config
-        config.auth.token = Some(login_response.token);
-        config
-            .save()
-            .context("Failed to save authentication token to config")?;
+        // Check if 2FA is required
+        if login_response.requires_2fa {
+            println!();
+            println!("Two-factor authentication required.");
+            println!();
 
-        println!("✓ Login successful!");
-        println!();
-        println!("Your authentication token has been saved to ~/.unrealpm/config.toml");
-        println!(
-            "Token expires in {} seconds (~{} hours)",
-            login_response.expires_in,
-            login_response.expires_in / 3600
-        );
-        println!();
-        println!("You can now publish packages with: unrealpm publish");
+            // Prompt for TOTP code
+            print!("Enter 6-digit code from your authenticator app: ");
+            io::stdout().flush()?;
+            let mut totp_code = String::new();
+            io::stdin().read_line(&mut totp_code)?;
+            let totp_code = totp_code.trim().to_string();
+
+            if totp_code.is_empty() {
+                anyhow::bail!("2FA code cannot be empty");
+            }
+
+            // Validate code format (6 digits)
+            if totp_code.len() != 6 || !totp_code.chars().all(|c| c.is_ascii_digit()) {
+                anyhow::bail!("Invalid 2FA code format. Please enter a 6-digit code.");
+            }
+
+            println!();
+            println!("Verifying 2FA code...");
+
+            // Second attempt with TOTP code
+            let request_body = LoginRequest {
+                email,
+                password,
+                totp_code: Some(totp_code),
+            };
+
+            let response = client
+                .post(&login_url)
+                .json(&request_body)
+                .send()
+                .context("Failed to send login request")?;
+
+            let status = response.status();
+
+            if status.is_success() {
+                let login_response: LoginResponse =
+                    response.json().context("Failed to parse login response")?;
+
+                if let Some(token) = login_response.token {
+                    // Save token to config
+                    config.auth.token = Some(token);
+                    config
+                        .save()
+                        .context("Failed to save authentication token to config")?;
+
+                    println!("✓ Login successful!");
+                    println!();
+                    println!("Your authentication token has been saved to ~/.unrealpm/config.toml");
+                    if let Some(expires_in) = login_response.expires_in {
+                        println!(
+                            "Token expires in {} seconds (~{} hours)",
+                            expires_in,
+                            expires_in / 3600
+                        );
+                    }
+                    println!();
+                    println!("You can now publish packages with: unrealpm publish");
+                } else {
+                    anyhow::bail!("Login succeeded but no token was returned");
+                }
+            } else {
+                // Handle error from 2FA attempt
+                let error_msg = if let Ok(error_response) = response.json::<ErrorResponse>() {
+                    error_response.error
+                } else {
+                    format!(
+                        "HTTP {}: {}",
+                        status.as_u16(),
+                        status.canonical_reason().unwrap_or("Unknown error")
+                    )
+                };
+
+                println!("✗ 2FA verification failed: {}", error_msg);
+                anyhow::bail!("Two-factor authentication failed");
+            }
+        } else if let Some(token) = login_response.token {
+            // No 2FA required, save token directly
+            config.auth.token = Some(token);
+            config
+                .save()
+                .context("Failed to save authentication token to config")?;
+
+            println!("✓ Login successful!");
+            println!();
+            println!("Your authentication token has been saved to ~/.unrealpm/config.toml");
+            if let Some(expires_in) = login_response.expires_in {
+                println!(
+                    "Token expires in {} seconds (~{} hours)",
+                    expires_in,
+                    expires_in / 3600
+                );
+            }
+            println!();
+            println!("You can now publish packages with: unrealpm publish");
+        } else {
+            anyhow::bail!("Login succeeded but no token was returned");
+        }
     } else {
         // Try to parse error response
         let error_msg = if let Ok(error_response) = response.json::<ErrorResponse>() {
