@@ -1,0 +1,50 @@
+[package]
+name = "unrealpm"
+version = "0.4.4"
+edition = "2021"
+authors = ["UnrealPM Contributors"]
+description = "A modern package manager for Unreal Engine plugins"
+# License TBD - currently proprietary
+repository = "https://github.com/unrealpm/unrealpm"
+homepage = "https://unrealpm.dev"
+keywords = ["unreal", "package-manager", "plugin", "unreal-engine"]
+categories = ["command-line-utilities", "development-tools"]
+
+[dependencies]
+clap = { version = "4.5", features = ["derive", "cargo"] }
+clap_complete = "4.5"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+reqwest = { version = "0.12", features = ["json", "blocking", "multipart"] }
+tokio = { version = "1.45", features = ["full"] }
+anyhow = "1.0"
+thiserror = "2.0"
+semver = "1.0"
+sha2 = "0.10"
+tar = "0.4"
+flate2 = "1.0"
+chrono = "0.4"
+indicatif = "0.17"
+walkdir = "2.4"
+regex = "1.10"
+ed25519-dalek = "2.1"
+signature = "2.2"
+pem = "3.0"
+rand = "0.8"
+hex = "0.4"
+shellexpand = "3.1"
+rpassword = "7.3"
+webbrowser = "1.0"
+tiny_http = "0.12"
+url = "2.5"
+urlencoding = "2.1"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.52"
+
+[dev-dependencies]
+tempfile = "3.14"
+mockito = "1.6"
+assert_cmd = "2.0"
+predicates = "3.1"
