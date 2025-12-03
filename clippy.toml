@@ -1,0 +1,3 @@
+# Clippy configuration
+# Warn on common mistakes and potential bugs
+warn-on-all-wildcard-imports = true

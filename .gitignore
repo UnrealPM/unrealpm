@@ -1,0 +1,6 @@
+/target
+
+# Test files - use /tmp for testing instead
+unrealpm.json
+unrealpm.lock
+Plugins/
