@@ -151,8 +151,11 @@ pub fn run(
     let registry = RegistryClient::from_config(&config)?;
 
     // Check if package already exists
-    if let Ok(existing) = registry.get_package(&plugin_name) {
-        // Check if this version already exists for this specific engine
+    let is_new_package = registry.get_package(&plugin_name).is_err();
+
+    if !is_new_package {
+        // Package exists, check if this version already exists
+        let existing = registry.get_package(&plugin_name)?;
         let version_exists = existing.versions.iter().any(|v| {
             v.version == uplugin.version_name && {
                 if is_multi_engine {
@@ -182,6 +185,21 @@ pub fn run(
                 );
             }
         }
+    } else {
+        // New package - show publishing rights notice
+        println!();
+        println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        println!("  ⚠ Publishing Rights Notice");
+        println!();
+        println!("  By publishing this package, you confirm that:");
+        println!("    • You have the rights to distribute this plugin");
+        println!("    • You are the author or have permission from the copyright holder");
+        println!("    • The content does not violate any third-party rights");
+        println!();
+        println!("  Violations will result in package removal and account termination.");
+        println!("  See: https://registry.unreal.dev/terms");
+        println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        println!();
     }
 
     // Check registry type to determine publish method

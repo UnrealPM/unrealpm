@@ -8,6 +8,7 @@ struct RegisterRequest {
     username: String,
     email: String,
     password: String,
+    accept_tos: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -104,6 +105,21 @@ pub fn run() -> Result<()> {
         anyhow::bail!("Passwords do not match");
     }
 
+    // Terms of Service acceptance
+    println!();
+    println!("Before registering, please review the Terms of Service:");
+    println!("  https://registry.unreal.dev/terms");
+    println!();
+    print!("Do you accept the Terms of Service? [y/N]: ");
+    io::stdout().flush()?;
+    let mut accept = String::new();
+    io::stdin().read_line(&mut accept)?;
+    let accept = accept.trim().to_lowercase();
+
+    if accept != "y" && accept != "yes" {
+        anyhow::bail!("You must accept the Terms of Service to register");
+    }
+
     println!();
     println!("Creating account...");
 
@@ -115,6 +131,7 @@ pub fn run() -> Result<()> {
         username,
         email: email.clone(),
         password: password.clone(),
+        accept_tos: true, // User confirmed above
     };
 
     let response = client
