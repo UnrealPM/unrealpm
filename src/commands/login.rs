@@ -22,6 +22,8 @@ struct LoginResponse {
     expires_in: Option<u64>,
     #[serde(default)]
     requires_2fa: bool,
+    #[serde(default)]
+    requires_tos: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -143,6 +145,22 @@ fn run_email_login() -> Result<()> {
     if status.is_success() {
         let login_response: LoginResponse =
             response.json().context("Failed to parse login response")?;
+
+        // Check if Terms of Service acceptance is required
+        if login_response.requires_tos {
+            println!();
+            println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            println!("  Terms of Service Acceptance Required");
+            println!();
+            println!("  You must accept the Terms of Service before logging in.");
+            println!("  Please visit the web interface to accept:");
+            println!();
+            println!("    {}/login", registry_url);
+            println!();
+            println!("  After accepting, run 'unrealpm login' again.");
+            println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            anyhow::bail!("Terms of Service acceptance required");
+        }
 
         // Check if 2FA is required
         if login_response.requires_2fa {
