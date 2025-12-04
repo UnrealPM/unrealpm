@@ -428,11 +428,16 @@ impl HttpRegistryClient {
 
     /// Search for packages by query string
     pub fn search(&self, query: &str) -> Result<Vec<String>> {
-        let url = format!(
-            "{}/api/v1/packages?q={}",
-            self.base_url,
-            urlencoding::encode(query)
-        );
+        // Don't send ?q= parameter when query is empty - registry treats empty query differently
+        let url = if query.is_empty() {
+            format!("{}/api/v1/packages", self.base_url)
+        } else {
+            format!(
+                "{}/api/v1/packages?q={}",
+                self.base_url,
+                urlencoding::encode(query)
+            )
+        };
 
         let response = self.client.get(&url).send().map_err(|e| {
             if e.is_connect() {
