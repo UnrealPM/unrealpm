@@ -163,6 +163,9 @@ enum Commands {
     /// Logout from UnrealPM registry
     Logout,
 
+    /// Show current logged-in user
+    Whoami,
+
     /// Unpublish a package version (or entire package)
     Unpublish {
         /// Package name with optional version (e.g., my-plugin@1.0.0 or my-plugin)
@@ -314,6 +317,7 @@ fn main() {
         Commands::Register => commands::register::run(),
         Commands::Login { github, email } => commands::login::run(github, email),
         Commands::Logout => commands::login::run_logout(),
+        Commands::Whoami => commands::whoami::run(),
         Commands::Unpublish { package, version } => commands::unpublish::run(package, version),
         Commands::Yank { package } => commands::yank::run(package, false),
         Commands::Unyank { package } => commands::yank::run(package, true),

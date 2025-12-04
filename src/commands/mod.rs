@@ -15,5 +15,6 @@ pub mod uninstall;
 pub mod unpublish;
 pub mod update;
 pub mod verify;
+pub mod whoami;
 pub mod why;
 pub mod yank;
