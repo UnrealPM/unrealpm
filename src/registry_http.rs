@@ -475,6 +475,55 @@ impl HttpRegistryClient {
         // Extract package names
         Ok(api_response.packages.into_iter().map(|p| p.name).collect())
     }
+
+    /// Search for packages by query string, returning full package info
+    pub fn search_packages(&self, query: &str) -> Result<Vec<ApiPackageInfo>> {
+        // Don't send ?q= parameter when query is empty - registry treats empty query differently
+        let url = if query.is_empty() {
+            format!("{}/api/v1/packages", self.base_url)
+        } else {
+            format!(
+                "{}/api/v1/packages?q={}",
+                self.base_url,
+                urlencoding::encode(query)
+            )
+        };
+
+        let response = self.client.get(&url).send().map_err(|e| {
+            if e.is_connect() {
+                Error::Other(format!(
+                    "Cannot connect to registry at {}\n\
+                        Please check that the registry is running and the URL is correct.",
+                    self.base_url
+                ))
+            } else if e.is_timeout() {
+                Error::Other("Registry request timed out. Please try again.".to_string())
+            } else {
+                Error::Other(format!("Failed to search packages: {}", e))
+            }
+        })?;
+
+        let status = response.status();
+
+        if !status.is_success() {
+            let error_msg = match status.as_u16() {
+                500 | 502 | 503 | 504 => format!(
+                    "Registry server error (HTTP {}).\n\
+                    The registry is experiencing issues. Please try again later.",
+                    status.as_u16()
+                ),
+                _ => format!("Search failed: HTTP {}", status.as_u16()),
+            };
+            return Err(Error::Other(error_msg));
+        }
+
+        // Parse response
+        let api_response: ApiPackageListResponse = response
+            .json()
+            .map_err(|e| Error::Other(format!("Failed to parse search response: {}", e)))?;
+
+        Ok(api_response.packages)
+    }
 }
 
 // Helper to parse package type string
@@ -507,13 +556,11 @@ struct ApiPackageListResponse {
     offset: i64,
 }
 
-#[derive(Debug, Deserialize)]
-struct ApiPackageInfo {
-    name: String,
-    #[allow(dead_code)]
-    description: Option<String>,
-    #[allow(dead_code)]
-    latest_version: Option<String>,
+#[derive(Debug, Deserialize, Clone)]
+pub struct ApiPackageInfo {
+    pub name: String,
+    pub description: Option<String>,
+    pub latest_version: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

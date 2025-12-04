@@ -236,6 +236,28 @@ impl RegistryClient {
             RegistryClient::Http(client) => client.search(query),
         }
     }
+
+    /// Search for packages with full metadata
+    pub fn search_packages(&self, query: &str) -> Result<Vec<crate::registry_http::ApiPackageInfo>> {
+        match self {
+            RegistryClient::File(client) => {
+                // For file registry, get basic info from each package
+                let names = client.search(query)?;
+                let mut results = Vec::new();
+                for name in names {
+                    if let Ok(pkg) = client.get_package(&name) {
+                        results.push(crate::registry_http::ApiPackageInfo {
+                            name: pkg.name,
+                            description: pkg.description,
+                            latest_version: pkg.versions.last().map(|v| v.version.clone()),
+                        });
+                    }
+                }
+                Ok(results)
+            }
+            RegistryClient::Http(client) => client.search_packages(query),
+        }
+    }
 }
 
 impl FileRegistryClient {
