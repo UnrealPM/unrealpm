@@ -1,10 +1,36 @@
 use anyhow::Result;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::env;
+use std::sync::Arc;
 use unrealpm::{
     find_matching_version, install_package, resolve_dependencies, verify_checksum,
-    verify_signature, Config, Lockfile, Manifest, PrebuiltBinary, RegistryClient,
+    verify_signature, Config, Lockfile, Manifest, PrebuiltBinary, ProgressCallback, RegistryClient,
 };
+
+/// Create an indicatif-based progress callback for CLI display
+fn create_spinner_callback() -> ProgressCallback {
+    let spinner = Arc::new(std::sync::Mutex::new(ProgressBar::new_spinner()));
+    {
+        let s = spinner.lock().unwrap();
+        s.set_style(
+            ProgressStyle::default_spinner()
+                .template("{spinner:.green} {msg}")
+                .unwrap()
+                .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"),
+        );
+        s.enable_steady_tick(std::time::Duration::from_millis(80));
+    }
+
+    let spinner_clone = spinner.clone();
+    Arc::new(move |msg: &str, current: u64, total: u64| {
+        let s = spinner_clone.lock().unwrap();
+        if current >= total && total > 0 {
+            s.finish_with_message(format!("✓ {}", msg));
+        } else {
+            s.set_message(msg.to_string());
+        }
+    })
+}
 
 pub fn run(
     package: Option<String>,
@@ -259,11 +285,13 @@ fn install_single_package(
         }
     }
 
-    // Verify checksum (has its own spinner now)
-    verify_checksum(&tarball_path, &checksum)?;
+    // Verify checksum with progress spinner
+    let progress = Some(create_spinner_callback());
+    verify_checksum(&tarball_path, &checksum, progress)?;
 
-    // Install package (has its own spinner now)
-    let installed_path = install_package(&tarball_path, &project_dir.to_path_buf(), &package_name)?;
+    // Install package with progress spinner
+    let progress = Some(create_spinner_callback());
+    let installed_path = install_package(&tarball_path, &project_dir.to_path_buf(), &package_name, progress)?;
     println!("  ✓ Installed to {}", installed_path.display());
 
     // Check if we should auto-build binaries (config already loaded above)
@@ -438,8 +466,8 @@ fn install_all_dependencies(
         // Get tarball path
         let tarball_path = registry.get_tarball_path(name, &resolved_pkg.version);
 
-        // Verify checksum
-        match verify_checksum(&tarball_path, &resolved_pkg.checksum) {
+        // Verify checksum (no spinner for batch installs - we have a progress bar)
+        match verify_checksum(&tarball_path, &resolved_pkg.checksum, None) {
             Ok(_) => {}
             Err(e) => {
                 eprintln!("  ✗ Checksum verification failed for {}: {}", name, e);
@@ -449,8 +477,8 @@ fn install_all_dependencies(
             }
         }
 
-        // Install package
-        match install_package(&tarball_path, &project_dir.to_path_buf(), name) {
+        // Install package (no spinner for batch installs)
+        match install_package(&tarball_path, &project_dir.to_path_buf(), name, None) {
             Ok(_installed_path) => {
                 // Update lockfile
                 lockfile.update_package(

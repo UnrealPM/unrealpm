@@ -11,10 +11,10 @@
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! // Verify checksum before installing
-//! verify_checksum("package.tar.gz", "sha256:abc123...")?;
+//! verify_checksum("package.tar.gz", "sha256:abc123...", None)?;
 //!
-//! // Install package
-//! let installed_path = install_package("package.tar.gz", ".", "my-plugin")?;
+//! // Install package with progress callback
+//! let installed_path = install_package("package.tar.gz", ".", "my-plugin", None)?;
 //! println!("Installed to: {:?}", installed_path);
 //! # Ok(())
 //! # }
@@ -22,12 +22,20 @@
 
 use crate::{Error, Result};
 use flate2::read::GzDecoder;
-use indicatif::{ProgressBar, ProgressStyle};
 use sha2::{Digest, Sha256};
 use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use tar::Archive;
+
+/// Progress callback for installation/verification operations
+///
+/// Called with:
+/// - `message`: Description of current operation (e.g., "Extracting package...")
+/// - `current`: Current progress (0-100 for percentage, or bytes processed)
+/// - `total`: Total work (100 for percentage, or total bytes)
+pub type ProgressCallback = Arc<dyn Fn(&str, u64, u64) + Send + Sync>;
 
 /// Install a package from a tarball to the target directory
 ///
@@ -42,6 +50,7 @@ use tar::Archive;
 /// * `tarball_path` - Path to the .tar.gz package file
 /// * `target_dir` - Project root directory
 /// * `package_name` - Name of the package being installed
+/// * `progress` - Optional callback for progress updates
 ///
 /// # Returns
 ///
@@ -50,6 +59,7 @@ pub fn install_package<P: AsRef<Path>>(
     tarball_path: P,
     target_dir: P,
     package_name: &str,
+    progress: Option<ProgressCallback>,
 ) -> Result<PathBuf> {
     let tarball_path = tarball_path.as_ref();
     let target_dir = target_dir.as_ref();
@@ -65,16 +75,10 @@ pub fn install_package<P: AsRef<Path>>(
     let plugins_dir = target_dir.join("Plugins");
     fs::create_dir_all(&plugins_dir)?;
 
-    // Create progress spinner for extraction
-    let spinner = ProgressBar::new_spinner();
-    spinner.set_style(
-        ProgressStyle::default_spinner()
-            .template("{spinner:.green} {msg}")
-            .unwrap()
-            .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"),
-    );
-    spinner.set_message(format!("Extracting {}...", package_name));
-    spinner.enable_steady_tick(std::time::Duration::from_millis(80));
+    // Report extraction start
+    if let Some(ref cb) = progress {
+        cb(&format!("Extracting {}...", package_name), 0, 100);
+    }
 
     // Open and extract the tarball
     let tar_gz = File::open(tarball_path)?;
@@ -84,7 +88,10 @@ pub fn install_package<P: AsRef<Path>>(
     // Extract to Plugins directory
     archive.unpack(&plugins_dir)?;
 
-    spinner.finish_with_message(format!("✓ Extracted {}", package_name));
+    // Report extraction complete
+    if let Some(ref cb) = progress {
+        cb(&format!("Extracted {}", package_name), 100, 100);
+    }
 
     let installed_path = plugins_dir.join(package_name);
 
@@ -183,28 +190,36 @@ fn find_extracted_plugin_dir(plugins_dir: &Path, package_name: &str) -> Result<P
 }
 
 /// Verify package checksum using SHA256
-pub fn verify_checksum<P: AsRef<Path>>(tarball_path: P, expected_checksum: &str) -> Result<()> {
+///
+/// # Arguments
+///
+/// * `tarball_path` - Path to the .tar.gz package file
+/// * `expected_checksum` - Expected SHA256 checksum (hex string)
+/// * `progress` - Optional callback for progress updates
+pub fn verify_checksum<P: AsRef<Path>>(
+    tarball_path: P,
+    expected_checksum: &str,
+    progress: Option<ProgressCallback>,
+) -> Result<()> {
     let tarball_path = tarball_path.as_ref();
 
     if expected_checksum.is_empty() {
         return Err(Error::Other("Empty checksum".to_string()));
     }
 
-    // Create progress spinner for checksum verification
-    let spinner = ProgressBar::new_spinner();
-    spinner.set_style(
-        ProgressStyle::default_spinner()
-            .template("{spinner:.cyan} {msg}")
-            .unwrap()
-            .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"),
-    );
-    spinner.set_message("Verifying checksum...");
-    spinner.enable_steady_tick(std::time::Duration::from_millis(80));
+    // Report verification start
+    if let Some(ref cb) = progress {
+        cb("Verifying checksum...", 0, 100);
+    }
+
+    // Get file size for progress reporting
+    let file_size = fs::metadata(tarball_path)?.len();
 
     // Read the tarball file
     let mut file = File::open(tarball_path)?;
     let mut hasher = Sha256::new();
     let mut buffer = vec![0; 8192]; // 8KB buffer for reading
+    let mut bytes_processed: u64 = 0;
 
     // Compute SHA256 hash
     loop {
@@ -213,6 +228,12 @@ pub fn verify_checksum<P: AsRef<Path>>(tarball_path: P, expected_checksum: &str)
             break;
         }
         hasher.update(&buffer[..bytes_read]);
+        bytes_processed += bytes_read as u64;
+
+        // Report progress
+        if let Some(ref cb) = progress {
+            cb("Verifying checksum...", bytes_processed, file_size);
+        }
     }
 
     // Get the computed hash as a hex string
@@ -220,10 +241,11 @@ pub fn verify_checksum<P: AsRef<Path>>(tarball_path: P, expected_checksum: &str)
 
     // Compare with expected checksum (case-insensitive)
     if computed_hash.eq_ignore_ascii_case(expected_checksum) {
-        spinner.finish_with_message("✓ Checksum verified");
+        if let Some(ref cb) = progress {
+            cb("Checksum verified", file_size, file_size);
+        }
         Ok(())
     } else {
-        spinner.finish_with_message("✗ Checksum mismatch");
         Err(Error::Other(format!(
             "Checksum mismatch!\nExpected: {}\nComputed: {}",
             expected_checksum, computed_hash

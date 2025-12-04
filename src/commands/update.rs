@@ -1,9 +1,36 @@
 use anyhow::Result;
+use indicatif::{ProgressBar, ProgressStyle};
 use std::env;
+use std::sync::Arc;
 use unrealpm::{
     find_matching_version, install_package, resolve_dependencies, verify_checksum, Config,
-    Lockfile, Manifest, RegistryClient,
+    Lockfile, Manifest, ProgressCallback, RegistryClient,
 };
+
+/// Create an indicatif-based progress callback for CLI display
+fn create_spinner_callback() -> ProgressCallback {
+    let spinner = Arc::new(std::sync::Mutex::new(ProgressBar::new_spinner()));
+    {
+        let s = spinner.lock().unwrap();
+        s.set_style(
+            ProgressStyle::default_spinner()
+                .template("{spinner:.green} {msg}")
+                .unwrap()
+                .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"),
+        );
+        s.enable_steady_tick(std::time::Duration::from_millis(80));
+    }
+
+    let spinner_clone = spinner.clone();
+    Arc::new(move |msg: &str, current: u64, total: u64| {
+        let s = spinner_clone.lock().unwrap();
+        if current >= total && total > 0 {
+            s.finish_with_message(format!("✓ {}", msg));
+        } else {
+            s.set_message(msg.to_string());
+        }
+    })
+}
 
 pub fn run(package: Option<String>, dry_run: bool) -> Result<()> {
     let current_dir = env::current_dir()?;
@@ -122,13 +149,13 @@ fn update_single_package(
     // Get tarball path
     let tarball_path = registry.get_tarball_path(package_name, &resolved_version.version);
 
-    // Verify checksum
-    println!("  Verifying checksum...");
-    verify_checksum(&tarball_path, &resolved_version.checksum)?;
+    // Verify checksum with progress spinner
+    let progress = Some(create_spinner_callback());
+    verify_checksum(&tarball_path, &resolved_version.checksum, progress)?;
 
-    // Install package (this will overwrite the existing installation)
-    println!("  Installing updated version...");
-    let installed_path = install_package(&tarball_path, &project_dir.to_path_buf(), package_name)?;
+    // Install package with progress spinner (this will overwrite the existing installation)
+    let progress = Some(create_spinner_callback());
+    let installed_path = install_package(&tarball_path, &project_dir.to_path_buf(), package_name, progress)?;
     println!("  ✓ Updated at {}", installed_path.display());
 
     // Update lockfile
@@ -264,8 +291,8 @@ fn update_all_packages(project_dir: &std::path::Path, dry_run: bool) -> Result<(
             // Get tarball path
             let tarball_path = registry.get_tarball_path(name, &resolved_pkg.version);
 
-            // Verify checksum
-            match verify_checksum(&tarball_path, &resolved_pkg.checksum) {
+            // Verify checksum (no spinner for batch updates)
+            match verify_checksum(&tarball_path, &resolved_pkg.checksum, None) {
                 Ok(_) => {}
                 Err(e) => {
                     eprintln!("    ✗ Checksum verification failed: {}", e);
@@ -274,8 +301,8 @@ fn update_all_packages(project_dir: &std::path::Path, dry_run: bool) -> Result<(
                 }
             }
 
-            // Install package
-            match install_package(&tarball_path, &project_dir.to_path_buf(), name) {
+            // Install package (no spinner for batch updates)
+            match install_package(&tarball_path, &project_dir.to_path_buf(), name, None) {
                 Ok(installed_path) => {
                     println!("    ✓ Installed to {}", installed_path.display());
                     updated_count += 1;

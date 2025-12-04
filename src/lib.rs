@@ -55,7 +55,7 @@ pub mod signing;
 
 pub use config::Config;
 pub use error::{Error, Result};
-pub use installer::{install_package, verify_checksum};
+pub use installer::{install_package, verify_checksum, ProgressCallback};
 pub use lockfile::{LockedPackage, Lockfile, LOCKFILE_NAME};
 pub use manifest::{Manifest, UPlugin, UProject};
 pub use platform::{
