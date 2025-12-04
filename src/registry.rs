@@ -238,7 +238,10 @@ impl RegistryClient {
     }
 
     /// Search for packages with full metadata
-    pub fn search_packages(&self, query: &str) -> Result<Vec<crate::registry_http::ApiPackageInfo>> {
+    pub fn search_packages(
+        &self,
+        query: &str,
+    ) -> Result<Vec<crate::registry_http::ApiPackageInfo>> {
         match self {
             RegistryClient::File(client) => {
                 // For file registry, get basic info from each package
