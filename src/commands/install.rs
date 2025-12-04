@@ -291,7 +291,12 @@ fn install_single_package(
 
     // Install package with progress spinner
     let progress = Some(create_spinner_callback());
-    let installed_path = install_package(&tarball_path, &project_dir.to_path_buf(), &package_name, progress)?;
+    let installed_path = install_package(
+        &tarball_path,
+        &project_dir.to_path_buf(),
+        &package_name,
+        progress,
+    )?;
     println!("  ✓ Installed to {}", installed_path.display());
 
     // Check if we should auto-build binaries (config already loaded above)

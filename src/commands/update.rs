@@ -155,7 +155,12 @@ fn update_single_package(
 
     // Install package with progress spinner (this will overwrite the existing installation)
     let progress = Some(create_spinner_callback());
-    let installed_path = install_package(&tarball_path, &project_dir.to_path_buf(), package_name, progress)?;
+    let installed_path = install_package(
+        &tarball_path,
+        &project_dir.to_path_buf(),
+        package_name,
+        progress,
+    )?;
     println!("  ✓ Updated at {}", installed_path.display());
 
     // Update lockfile
