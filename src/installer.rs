@@ -75,6 +75,40 @@ pub fn install_package<P: AsRef<Path>>(
     let plugins_dir = target_dir.join("Plugins");
     fs::create_dir_all(&plugins_dir)?;
 
+    // Before extracting, remove any existing installation by searching for the .uplugin file
+    // The .uplugin filename is the canonical identifier for a plugin
+    let uplugin_name = format!("{}.uplugin", package_name);
+    if let Ok(entries) = fs::read_dir(&plugins_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                // Check if this directory contains the matching .uplugin file (case-insensitive)
+                if let Ok(dir_entries) = fs::read_dir(&path) {
+                    for dir_entry in dir_entries.flatten() {
+                        let file_path = dir_entry.path();
+                        if file_path.is_file() {
+                            if let Some(file_name) = file_path.file_name() {
+                                if file_name.to_string_lossy().eq_ignore_ascii_case(&uplugin_name) {
+                                    if let Some(ref cb) = progress {
+                                        cb(&format!("Removing existing installation of {}...", package_name), 0, 100);
+                                    }
+                                    fs::remove_dir_all(&path).map_err(|e| {
+                                        Error::Other(format!(
+                                            "Failed to remove existing plugin directory '{}': {}",
+                                            path.display(),
+                                            e
+                                        ))
+                                    })?;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // Report extraction start
     if let Some(ref cb) = progress {
         cb(&format!("Extracting {}...", package_name), 0, 100);
