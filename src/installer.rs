@@ -91,7 +91,10 @@ pub fn install_package<P: AsRef<Path>>(
                         let file_path = dir_entry.path();
                         if file_path.is_file() {
                             if let Some(file_name) = file_path.file_name() {
-                                if file_name.to_string_lossy().eq_ignore_ascii_case(&uplugin_name) {
+                                if file_name
+                                    .to_string_lossy()
+                                    .eq_ignore_ascii_case(&uplugin_name)
+                                {
                                     existing_plugin_dir = Some(path);
                                     break 'outer;
                                 }
