@@ -75,11 +75,14 @@ pub fn install_package<P: AsRef<Path>>(
     let plugins_dir = target_dir.join("Plugins");
     fs::create_dir_all(&plugins_dir)?;
 
-    // Before extracting, remove any existing installation by searching for the .uplugin file
+    // Before extracting, check for existing installation by searching for the .uplugin file
     // The .uplugin filename is the canonical identifier for a plugin
     let uplugin_name = format!("{}.uplugin", package_name);
+    let mut existing_plugin_dir: Option<PathBuf> = None;
+    let mut backup_dir: Option<PathBuf> = None;
+
     if let Ok(entries) = fs::read_dir(&plugins_dir) {
-        for entry in entries.flatten() {
+        'outer: for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
                 // Check if this directory contains the matching .uplugin file (case-insensitive)
@@ -89,17 +92,8 @@ pub fn install_package<P: AsRef<Path>>(
                         if file_path.is_file() {
                             if let Some(file_name) = file_path.file_name() {
                                 if file_name.to_string_lossy().eq_ignore_ascii_case(&uplugin_name) {
-                                    if let Some(ref cb) = progress {
-                                        cb(&format!("Removing existing installation of {}...", package_name), 0, 100);
-                                    }
-                                    fs::remove_dir_all(&path).map_err(|e| {
-                                        Error::Other(format!(
-                                            "Failed to remove existing plugin directory '{}': {}",
-                                            path.display(),
-                                            e
-                                        ))
-                                    })?;
-                                    break;
+                                    existing_plugin_dir = Some(path);
+                                    break 'outer;
                                 }
                             }
                         }
@@ -109,18 +103,62 @@ pub fn install_package<P: AsRef<Path>>(
         }
     }
 
+    // If existing installation found, back it up before installing
+    if let Some(ref existing_dir) = existing_plugin_dir {
+        let backup_path = plugins_dir.join(format!("{}.unrealpm_backup", package_name));
+
+        // Remove any stale backup from a previous failed install
+        if backup_path.exists() {
+            let _ = fs::remove_dir_all(&backup_path);
+        }
+
+        if let Some(ref cb) = progress {
+            cb(&format!("Backing up existing {}...", package_name), 0, 100);
+        }
+
+        fs::rename(existing_dir, &backup_path).map_err(|e| {
+            Error::Other(format!(
+                "Failed to backup existing plugin '{}' to '{}': {}",
+                existing_dir.display(),
+                backup_path.display(),
+                e
+            ))
+        })?;
+
+        backup_dir = Some(backup_path);
+    }
+
     // Report extraction start
     if let Some(ref cb) = progress {
         cb(&format!("Extracting {}...", package_name), 0, 100);
     }
 
+    // Helper closure to restore backup on failure
+    let restore_backup = |backup: &Option<PathBuf>, original: &Option<PathBuf>| {
+        if let (Some(backup_path), Some(original_path)) = (backup, original) {
+            if backup_path.exists() {
+                // Try to restore the backup
+                let _ = fs::rename(backup_path, original_path);
+            }
+        }
+    };
+
     // Open and extract the tarball
-    let tar_gz = File::open(tarball_path)?;
+    let tar_gz = match File::open(tarball_path) {
+        Ok(f) => f,
+        Err(e) => {
+            restore_backup(&backup_dir, &existing_plugin_dir);
+            return Err(e.into());
+        }
+    };
     let tar = GzDecoder::new(tar_gz);
     let mut archive = Archive::new(tar);
 
     // Extract to Plugins directory
-    archive.unpack(&plugins_dir)?;
+    if let Err(e) = archive.unpack(&plugins_dir) {
+        restore_backup(&backup_dir, &existing_plugin_dir);
+        return Err(e.into());
+    }
 
     // Report extraction complete
     if let Some(ref cb) = progress {
@@ -131,34 +169,53 @@ pub fn install_package<P: AsRef<Path>>(
 
     // Check if the expected path exists
     if installed_path.exists() {
+        // Success - remove backup
+        if let Some(ref backup_path) = backup_dir {
+            let _ = fs::remove_dir_all(backup_path);
+        }
         return Ok(installed_path);
     }
 
     // The tarball's root folder might have a different name than the package.
     // Find the actual extracted directory by looking for the .uplugin file.
-    let extracted_dir = find_extracted_plugin_dir(&plugins_dir, package_name)?;
+    let extracted_dir = match find_extracted_plugin_dir(&plugins_dir, package_name) {
+        Ok(dir) => dir,
+        Err(e) => {
+            restore_backup(&backup_dir, &existing_plugin_dir);
+            return Err(e);
+        }
+    };
 
     // If the extracted directory has a different name, rename it to match package_name
     if extracted_dir != installed_path {
         // Remove any existing directory with the target name (shouldn't happen, but be safe)
         if installed_path.exists() {
-            fs::remove_dir_all(&installed_path)?;
+            if let Err(e) = fs::remove_dir_all(&installed_path) {
+                restore_backup(&backup_dir, &existing_plugin_dir);
+                return Err(e.into());
+            }
         }
 
         // Rename the extracted directory to the expected name
-        fs::rename(&extracted_dir, &installed_path).map_err(|e| {
-            Error::Other(format!(
+        if let Err(e) = fs::rename(&extracted_dir, &installed_path) {
+            restore_backup(&backup_dir, &existing_plugin_dir);
+            return Err(Error::Other(format!(
                 "Failed to rename plugin directory from '{}' to '{}': {}",
                 extracted_dir.display(),
                 installed_path.display(),
                 e
-            ))
-        })?;
+            )));
+        }
     }
 
     if installed_path.exists() {
+        // Success - remove backup
+        if let Some(ref backup_path) = backup_dir {
+            let _ = fs::remove_dir_all(backup_path);
+        }
         Ok(installed_path)
     } else {
+        restore_backup(&backup_dir, &existing_plugin_dir);
         Err(Error::Other(format!(
             "Package extraction succeeded but plugin directory not found: {}",
             installed_path.display()
