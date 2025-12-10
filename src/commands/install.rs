@@ -160,6 +160,76 @@ fn install_single_package(
         resolved_version.version
     ));
 
+    // Resolve transitive dependencies
+    let mut direct_deps = std::collections::HashMap::new();
+    direct_deps.insert(package_name.clone(), version_constraint.clone());
+
+    let spinner = ProgressBar::new_spinner();
+    spinner.set_style(
+        ProgressStyle::default_spinner()
+            .template("{spinner:.blue} {msg}")
+            .unwrap()
+            .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"),
+    );
+    spinner.set_message("Resolving dependencies...");
+    spinner.enable_steady_tick(std::time::Duration::from_millis(80));
+
+    let all_resolved = resolve_dependencies(&direct_deps, &registry, engine_version, force)?;
+
+    let dep_count = all_resolved.len();
+    if dep_count > 1 {
+        spinner.finish_with_message(format!(
+            "✓ Resolved {} packages (including {} dependencies)",
+            dep_count,
+            dep_count - 1
+        ));
+    } else {
+        spinner.finish_with_message("✓ No additional dependencies");
+    }
+
+    // Install dependencies first (before the main package)
+    let mut lockfile = Lockfile::load()?.unwrap_or_default();
+
+    for (dep_name, resolved_pkg) in &all_resolved {
+        if dep_name == &package_name {
+            continue; // Skip the main package, we'll install it with full verification below
+        }
+
+        // Check if already installed
+        if let Some(locked) = lockfile.get_package(dep_name) {
+            if locked.version == resolved_pkg.version {
+                println!("  ✓ {} {} (already installed)", dep_name, resolved_pkg.version);
+                continue;
+            }
+        }
+
+        println!("  Installing dependency {}@{}...", dep_name, resolved_pkg.version);
+
+        // Download if HTTP registry
+        let dep_tarball = match &registry {
+            unrealpm::RegistryClient::Http(http_client) => {
+                http_client.download_if_needed(dep_name, &resolved_pkg.version, &resolved_pkg.checksum)?
+            }
+            unrealpm::RegistryClient::File(_) => registry.get_tarball_path(dep_name, &resolved_pkg.version),
+        };
+
+        // Verify checksum
+        verify_checksum(&dep_tarball, &resolved_pkg.checksum, None)?;
+
+        // Install
+        install_package(&dep_tarball, &project_dir.to_path_buf(), dep_name, None)?;
+
+        // Update lockfile
+        lockfile.update_package(
+            dep_name.clone(),
+            resolved_pkg.version.clone(),
+            resolved_pkg.checksum.clone(),
+            resolved_pkg.dependencies.clone(),
+        );
+
+        println!("  ✓ Installed {}", dep_name);
+    }
+
     // Determine which tarball to use (binary or source)
     let (tarball_path, checksum, install_type) = select_installation_source(
         &resolved_version,
@@ -334,19 +404,17 @@ fn install_single_package(
         .insert(package_name.clone(), version_constraint.clone());
     manifest.save(project_dir)?;
 
-    // Update lockfile
+    // Update lockfile with main package (dependencies already added earlier)
     println!("  Updating lockfile...");
-    let mut lockfile = Lockfile::load()?.unwrap_or_default();
-    lockfile.update_package(
-        package_name.clone(),
-        resolved_version.version.clone(),
-        resolved_version.checksum.clone(),
-        resolved_version.dependencies.as_ref().map(|deps| {
-            deps.iter()
-                .map(|d| (d.name.clone(), d.version.clone()))
-                .collect()
-        }),
-    );
+    // Get the resolved info for the main package from all_resolved
+    if let Some(main_pkg) = all_resolved.get(&package_name) {
+        lockfile.update_package(
+            package_name.clone(),
+            main_pkg.version.clone(),
+            main_pkg.checksum.clone(),
+            main_pkg.dependencies.clone(),
+        );
+    }
     lockfile.save()?;
     println!("  ✓ Lockfile updated");
 

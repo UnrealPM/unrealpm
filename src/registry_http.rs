@@ -128,6 +128,40 @@ impl HttpRegistryClient {
         })
     }
 
+    /// Get dependencies for a specific version from HTTP registry
+    /// This fetches the detailed version info which includes dependencies
+    pub fn get_version_dependencies(
+        &self,
+        name: &str,
+        version: &str,
+    ) -> Result<Option<Vec<crate::Dependency>>> {
+        let url = format!("{}/api/v1/packages/{}/{}", self.base_url, name, version);
+
+        let response = self.client.get(&url).send().map_err(|e| {
+            Error::Other(format!("Failed to fetch version details: {}", e))
+        })?;
+
+        if !response.status().is_success() {
+            return Err(Error::Other(format!(
+                "Failed to fetch version details: HTTP {}",
+                response.status()
+            )));
+        }
+
+        let detail: ApiVersionDetail = response
+            .json()
+            .map_err(|e| Error::Other(format!("Failed to parse version details: {}", e)))?;
+
+        Ok(detail.dependencies.map(|deps| {
+            deps.into_iter()
+                .map(|d| crate::Dependency {
+                    name: d.name,
+                    version: d.version_constraint,
+                })
+                .collect()
+        }))
+    }
+
     /// Get tarball path (downloads if not cached)
     pub fn get_tarball_path(&self, name: &str, version: &str) -> PathBuf {
         self.cache_dir
@@ -589,7 +623,6 @@ struct ApiVersionInfo {
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 struct ApiVersionDetail {
     version: String,
     checksum: String,
@@ -601,10 +634,10 @@ struct ApiVersionDetail {
     public_key: Option<String>,
     signed_at: Option<String>,
     dependencies: Option<Vec<ApiDependency>>,
+    tarball_url: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 struct ApiDependency {
     name: String,
     version_constraint: String,
