@@ -625,6 +625,7 @@ struct ApiVersionInfo {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)] // Fields used for deserialization, will be used in future features
 struct ApiVersionDetail {
     version: String,
     checksum: String,
