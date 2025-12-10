@@ -198,19 +198,29 @@ fn install_single_package(
         // Check if already installed
         if let Some(locked) = lockfile.get_package(dep_name) {
             if locked.version == resolved_pkg.version {
-                println!("  ✓ {} {} (already installed)", dep_name, resolved_pkg.version);
+                println!(
+                    "  ✓ {} {} (already installed)",
+                    dep_name, resolved_pkg.version
+                );
                 continue;
             }
         }
 
-        println!("  Installing dependency {}@{}...", dep_name, resolved_pkg.version);
+        println!(
+            "  Installing dependency {}@{}...",
+            dep_name, resolved_pkg.version
+        );
 
         // Download if HTTP registry
         let dep_tarball = match &registry {
-            unrealpm::RegistryClient::Http(http_client) => {
-                http_client.download_if_needed(dep_name, &resolved_pkg.version, &resolved_pkg.checksum)?
+            unrealpm::RegistryClient::Http(http_client) => http_client.download_if_needed(
+                dep_name,
+                &resolved_pkg.version,
+                &resolved_pkg.checksum,
+            )?,
+            unrealpm::RegistryClient::File(_) => {
+                registry.get_tarball_path(dep_name, &resolved_pkg.version)
             }
-            unrealpm::RegistryClient::File(_) => registry.get_tarball_path(dep_name, &resolved_pkg.version),
         };
 
         // Verify checksum

@@ -57,7 +57,7 @@ pub use config::Config;
 pub use error::{Error, Result};
 pub use installer::{install_package, verify_checksum, ProgressCallback};
 pub use lockfile::{LockedPackage, Lockfile, LOCKFILE_NAME};
-pub use manifest::{Manifest, UPlugin, UProject};
+pub use manifest::{Manifest, UPlugin, UPluginDependency, UProject};
 pub use platform::{
     detect_platform, detect_unreal_engines, normalize_engine_version, resolve_engine_association,
     wsl_to_windows_path,
