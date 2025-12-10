@@ -137,9 +137,11 @@ impl HttpRegistryClient {
     ) -> Result<Option<Vec<crate::Dependency>>> {
         let url = format!("{}/api/v1/packages/{}/{}", self.base_url, name, version);
 
-        let response = self.client.get(&url).send().map_err(|e| {
-            Error::Other(format!("Failed to fetch version details: {}", e))
-        })?;
+        let response = self
+            .client
+            .get(&url)
+            .send()
+            .map_err(|e| Error::Other(format!("Failed to fetch version details: {}", e)))?;
 
         if !response.status().is_success() {
             return Err(Error::Other(format!(

@@ -79,6 +79,17 @@ pub fn run(
     if let Some(engine) = &uplugin.engine_version {
         println!("    Engine version: {}", engine);
     }
+
+    // Get enabled plugin dependencies from .uplugin
+    let plugin_dependencies: Vec<_> = uplugin.plugins.iter().filter(|p| p.enabled).collect();
+
+    if !plugin_dependencies.is_empty() {
+        println!();
+        println!("  Detected plugin dependencies from .uplugin:");
+        for dep in &plugin_dependencies {
+            println!("    • {}", dep.name);
+        }
+    }
     println!();
 
     // Check if auto-build is enabled
@@ -150,6 +161,40 @@ pub fn run(
     // Get registry client (uses HTTP if configured)
     let registry = RegistryClient::from_config(&config)?;
 
+    // Validate plugin dependencies exist in registry
+    let mut validated_dependencies: Vec<(String, String)> = Vec::new();
+    let mut missing_dependencies: Vec<String> = Vec::new();
+
+    for dep in &plugin_dependencies {
+        match registry.get_package(&dep.name) {
+            Ok(pkg) => {
+                // Found in registry - get latest version for display
+                let latest = pkg
+                    .versions
+                    .first()
+                    .map(|v| v.version.clone())
+                    .unwrap_or_else(|| "unknown".to_string());
+                validated_dependencies.push((dep.name.clone(), latest));
+            }
+            Err(_) => {
+                // Not found in registry
+                missing_dependencies.push(dep.name.clone());
+            }
+        }
+    }
+
+    // Show validation results
+    if !validated_dependencies.is_empty() || !missing_dependencies.is_empty() {
+        println!("  Validating dependencies...");
+        for (name, version) in &validated_dependencies {
+            println!("    ✓ {} (found v{})", name, version);
+        }
+        for name in &missing_dependencies {
+            println!("    ⚠ {} (not in registry - will be added anyway)", name);
+        }
+        println!();
+    }
+
     // Check if package already exists
     let is_new_package = registry.get_package(&plugin_name).is_err();
 
@@ -220,6 +265,7 @@ pub fn run(
                 is_multi_engine,
                 git_repo.clone(),
                 git_ref.clone(),
+                &plugin_dependencies,
             )?;
 
             // Clean up temp directory
@@ -328,12 +374,11 @@ pub fn run(
         is_multi_engine,
         package_type,
         binaries: None, // Will be added manually or via future `publish-binary` command
-        dependencies: if uplugin.plugins.is_empty() {
+        dependencies: if plugin_dependencies.is_empty() {
             None
         } else {
             Some(
-                uplugin
-                    .plugins
+                plugin_dependencies
                     .iter()
                     .map(|p| unrealpm::Dependency {
                         name: p.name.clone(),
@@ -459,6 +504,7 @@ fn publish_to_http(
     is_multi_engine: bool,
     git_repo: Option<String>,
     git_ref: Option<String>,
+    plugin_dependencies: &[&unrealpm::UPluginDependency],
 ) -> Result<()> {
     // Sign the package if enabled
     let (public_key, signed_at, signature_path) = if config.signing.enabled {
@@ -500,12 +546,11 @@ fn publish_to_http(
         } else {
             None // Engine-specific versions don't use array
         },
-        dependencies: if uplugin.plugins.is_empty() {
+        dependencies: if plugin_dependencies.is_empty() {
             None
         } else {
             Some(
-                uplugin
-                    .plugins
+                plugin_dependencies
                     .iter()
                     .map(|p| unrealpm::registry_http::DependencySpec {
                         name: p.name.clone(),
