@@ -242,8 +242,18 @@ pub fn resolve_dependencies(
         let resolved_version =
             find_matching_version(&metadata, &version_constraint, engine_version, force)?;
 
+        // Get dependencies - if not in metadata, fetch from registry
+        let dependencies = if resolved_version.dependencies.is_some() {
+            resolved_version.dependencies.clone()
+        } else {
+            // Fetch dependencies from version detail endpoint (for HTTP registry)
+            registry
+                .get_version_dependencies(&package_name, &resolved_version.version)
+                .unwrap_or(None)
+        };
+
         // Add transitive dependencies to the queue
-        if let Some(deps) = &resolved_version.dependencies {
+        if let Some(deps) = &dependencies {
             for dep in deps {
                 if !visited.contains(&dep.name) {
                     to_visit.push((dep.name.clone(), dep.version.clone()));
@@ -258,7 +268,7 @@ pub fn resolve_dependencies(
                 name: package_name.clone(),
                 version: resolved_version.version.clone(),
                 checksum: resolved_version.checksum.clone(),
-                dependencies: resolved_version.dependencies.as_ref().map(|deps| {
+                dependencies: dependencies.as_ref().map(|deps| {
                     deps.iter()
                         .map(|d| (d.name.clone(), d.version.clone()))
                         .collect()

@@ -261,6 +261,29 @@ impl RegistryClient {
             RegistryClient::Http(client) => client.search_packages(query),
         }
     }
+
+    /// Get dependencies for a specific package version
+    /// For HTTP registry, this fetches from the version detail endpoint
+    /// For file registry, dependencies are already in the package metadata
+    pub fn get_version_dependencies(
+        &self,
+        name: &str,
+        version: &str,
+    ) -> Result<Option<Vec<Dependency>>> {
+        match self {
+            RegistryClient::File(client) => {
+                // For file registry, dependencies are in the package metadata
+                let pkg = client.get_package(name)?;
+                for v in &pkg.versions {
+                    if v.version == version {
+                        return Ok(v.dependencies.clone());
+                    }
+                }
+                Ok(None)
+            }
+            RegistryClient::Http(client) => client.get_version_dependencies(name, version),
+        }
+    }
 }
 
 impl FileRegistryClient {
