@@ -90,6 +90,12 @@ pub fn run(
             println!("    • {}", dep.name);
         }
     }
+
+    // Look for README file
+    let readme_content = find_readme(&plugin_dir);
+    if let Some((readme_name, _)) = &readme_content {
+        println!("  ✓ Found {}", readme_name);
+    }
     println!();
 
     // Check if auto-build is enabled
@@ -266,6 +272,7 @@ pub fn run(
                 git_repo.clone(),
                 git_ref.clone(),
                 &plugin_dependencies,
+                readme_content,
             )?;
 
             // Clean up temp directory
@@ -450,20 +457,64 @@ fn should_include_entry(entry: &walkdir::DirEntry, include_binaries: bool) -> bo
     let path = entry.path();
     let path_str = path.to_string_lossy();
 
-    // Exclude patterns
+    // Exclude patterns - files/directories that should never be in published packages
     let exclude_patterns = vec![
+        // Version control
         ".git",
         ".gitignore",
+        ".gitattributes",
+        ".gitmodules",
+        ".svn",
+        ".hg",
+        // CI/CD
+        ".gitlab-ci.yml",
+        ".github",
+        ".travis.yml",
+        ".circleci",
+        "azure-pipelines.yml",
+        "Jenkinsfile",
+        // IDE/Editor
         ".vs",
         ".vscode",
         ".idea",
+        ".claude",
+        "*.code-workspace",
+        // Environment/Secrets (security!)
+        ".env",
+        ".env.local",
+        ".env.development",
+        ".env.production",
+        "*.pem",
+        "*.key",
+        "credentials.json",
+        "secrets.json",
+        // Unreal build artifacts
         "Intermediate",
         "Saved",
+        "DerivedDataCache",
+        "Build",
+        // Project files
         "*.sln",
         "*.suo",
         "*.user",
         "*.log",
+        // OS files
         ".DS_Store",
+        "Thumbs.db",
+        "desktop.ini",
+        // Documentation/dev files (optional but usually not needed)
+        "CLAUDE.md",
+        "CONTRIBUTING.md",
+        "CHANGELOG.md",
+        // Node/other tooling that might be present
+        "node_modules",
+        "__pycache__",
+        ".pytest_cache",
+        // Backup files
+        "*.bak",
+        "*.tmp",
+        "*.swp",
+        "*~",
     ];
 
     // Check if we should exclude binaries
@@ -505,6 +556,7 @@ fn publish_to_http(
     git_repo: Option<String>,
     git_ref: Option<String>,
     plugin_dependencies: &[&unrealpm::UPluginDependency],
+    readme_content: Option<(String, String)>,
 ) -> Result<()> {
     // Sign the package if enabled
     let (public_key, signed_at, signature_path) = if config.signing.enabled {
@@ -532,6 +584,18 @@ fn publish_to_http(
         (Some(public_key_hex), Some(signed_at_str), Some(sig_path))
     } else {
         (None, None, None)
+    };
+
+    // Extract README info
+    let (readme, readme_type) = if let Some((filename, content)) = readme_content {
+        let rtype = if filename.to_lowercase().ends_with(".md") {
+            "markdown"
+        } else {
+            "text"
+        };
+        (Some(content), Some(rtype.to_string()))
+    } else {
+        (None, None)
     };
 
     // Build metadata for HTTP API
@@ -567,10 +631,40 @@ fn publish_to_http(
         is_multi_engine: Some(is_multi_engine),
         git_repository: git_repo,
         git_tag: git_ref,
+        readme,
+        readme_type,
     };
 
     // Publish via HTTP
     http_client.publish(tarball_path, signature_path.as_deref(), metadata)?;
 
     Ok(())
+}
+
+/// Find README file in plugin directory
+/// Returns (filename, content) if found
+fn find_readme(plugin_dir: &Path) -> Option<(String, String)> {
+    // Common README filenames in order of preference
+    let readme_names = [
+        "README.md",
+        "readme.md",
+        "Readme.md",
+        "README.MD",
+        "README.txt",
+        "README",
+        "readme.txt",
+        "readme",
+    ];
+
+    for name in &readme_names {
+        let path = plugin_dir.join(name);
+        if path.exists() {
+            if let Ok(content) = fs::read_to_string(&path) {
+                // Determine type based on extension
+                return Some((name.to_string(), content));
+            }
+        }
+    }
+
+    None
 }

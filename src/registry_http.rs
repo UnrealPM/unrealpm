@@ -26,6 +26,8 @@ pub struct PublishMetadata {
     pub is_multi_engine: Option<bool>,
     pub git_repository: Option<String>,
     pub git_tag: Option<String>,
+    pub readme: Option<String>,
+    pub readme_type: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
