@@ -45,6 +45,18 @@ enum Commands {
         /// Show what would be installed without actually installing
         #[arg(long)]
         dry_run: bool,
+
+        /// Show verbose conflict information during dependency resolution
+        #[arg(long)]
+        verbose_resolve: bool,
+
+        /// Maximum dependency depth (default: 100)
+        #[arg(long)]
+        max_depth: Option<usize>,
+
+        /// Resolution timeout in seconds (0 = no timeout)
+        #[arg(long)]
+        resolve_timeout: Option<u64>,
     },
 
     /// Uninstall a package
@@ -61,6 +73,18 @@ enum Commands {
         /// Show what would be updated without actually updating
         #[arg(long)]
         dry_run: bool,
+
+        /// Show verbose conflict information during dependency resolution
+        #[arg(long)]
+        verbose_resolve: bool,
+
+        /// Maximum dependency depth (default: 100)
+        #[arg(long)]
+        max_depth: Option<usize>,
+
+        /// Resolution timeout in seconds (0 = no timeout)
+        #[arg(long)]
+        resolve_timeout: Option<u64>,
     },
 
     /// List installed packages
@@ -281,6 +305,9 @@ fn main() {
             source_only,
             binary_only,
             dry_run,
+            verbose_resolve,
+            max_depth,
+            resolve_timeout,
         } => commands::install::run(
             package,
             force,
@@ -289,9 +316,18 @@ fn main() {
             source_only,
             binary_only,
             dry_run,
+            verbose_resolve,
+            max_depth,
+            resolve_timeout,
         ),
         Commands::Uninstall { package } => commands::uninstall::run(package),
-        Commands::Update { package, dry_run } => commands::update::run(package, dry_run),
+        Commands::Update {
+            package,
+            dry_run,
+            verbose_resolve,
+            max_depth,
+            resolve_timeout,
+        } => commands::update::run(package, dry_run, verbose_resolve, max_depth, resolve_timeout),
         Commands::List => commands::list::run(),
         Commands::Outdated => commands::outdated::run(),
         Commands::Tree => commands::tree::run(),

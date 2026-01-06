@@ -4,7 +4,7 @@ use std::env;
 use std::sync::Arc;
 use unrealpm::{
     find_matching_version, install_package, resolve_dependencies, verify_checksum, Config,
-    Lockfile, Manifest, ProgressCallback, RegistryClient,
+    Lockfile, Manifest, ProgressCallback, RegistryClient, ResolverConfig,
 };
 
 /// Create an indicatif-based progress callback for CLI display
@@ -32,12 +32,27 @@ fn create_spinner_callback() -> ProgressCallback {
     })
 }
 
-pub fn run(package: Option<String>, dry_run: bool) -> Result<()> {
+pub fn run(
+    package: Option<String>,
+    dry_run: bool,
+    verbose_resolve: bool,
+    max_depth: Option<usize>,
+    resolve_timeout: Option<u64>,
+) -> Result<()> {
     let current_dir = env::current_dir()?;
+
+    // Build resolver config from CLI args and loaded config
+    let loaded_config = Config::load()?;
+    let resolver_config = ResolverConfig {
+        max_depth: max_depth.unwrap_or(loaded_config.resolver.max_depth),
+        verbose_conflicts: verbose_resolve || loaded_config.resolver.verbose_conflicts,
+        resolution_timeout_seconds: resolve_timeout
+            .unwrap_or(loaded_config.resolver.resolution_timeout_seconds),
+    };
 
     match package {
         Some(pkg) => update_single_package(&pkg, &current_dir, dry_run),
-        None => update_all_packages(&current_dir, dry_run),
+        None => update_all_packages(&current_dir, dry_run, &resolver_config),
     }
 }
 
@@ -189,7 +204,11 @@ fn update_single_package(
     Ok(())
 }
 
-fn update_all_packages(project_dir: &std::path::Path, dry_run: bool) -> Result<()> {
+fn update_all_packages(
+    project_dir: &std::path::Path,
+    dry_run: bool,
+    resolver_config: &ResolverConfig,
+) -> Result<()> {
     if dry_run {
         println!("[DRY RUN] Would update all packages...");
     } else {
@@ -226,7 +245,7 @@ fn update_all_packages(project_dir: &std::path::Path, dry_run: bool) -> Result<(
 
     // Resolve all dependencies (this will get latest matching versions)
     println!("Resolving latest versions...");
-    let resolved = resolve_dependencies(&manifest.dependencies, &registry, engine_version, false)?;
+    let resolved = resolve_dependencies(&manifest.dependencies, &registry, engine_version, false, Some(resolver_config))?;
     println!("  ✓ Resolved {} packages", resolved.len());
     println!();
 

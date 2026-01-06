@@ -4,7 +4,8 @@ use std::env;
 use std::sync::Arc;
 use unrealpm::{
     find_matching_version, install_package, resolve_dependencies, verify_checksum,
-    verify_signature, Config, Lockfile, Manifest, PrebuiltBinary, ProgressCallback, RegistryClient,
+    verify_signature, Config, Lockfile, Manifest, PrebuiltBinary, ProgressCallback,
+    RegistryClient, ResolverConfig,
 };
 
 /// Create an indicatif-based progress callback for CLI display
@@ -40,6 +41,9 @@ pub fn run(
     source_only: bool,
     binary_only: bool,
     dry_run: bool,
+    verbose_resolve: bool,
+    max_depth: Option<usize>,
+    resolve_timeout: Option<u64>,
 ) -> Result<()> {
     let current_dir = env::current_dir()?;
 
@@ -54,6 +58,15 @@ pub fn run(
         InstallMode::PreferSource
     };
 
+    // Build resolver config from CLI args and loaded config
+    let loaded_config = Config::load()?;
+    let resolver_config = ResolverConfig {
+        max_depth: max_depth.unwrap_or(loaded_config.resolver.max_depth),
+        verbose_conflicts: verbose_resolve || loaded_config.resolver.verbose_conflicts,
+        resolution_timeout_seconds: resolve_timeout
+            .unwrap_or(loaded_config.resolver.resolution_timeout_seconds),
+    };
+
     match package {
         Some(pkg) => install_single_package(
             &pkg,
@@ -62,6 +75,7 @@ pub fn run(
             engine_version_override,
             install_mode,
             dry_run,
+            &resolver_config,
         ),
         None => install_all_dependencies(
             &current_dir,
@@ -69,6 +83,7 @@ pub fn run(
             engine_version_override,
             install_mode,
             dry_run,
+            &resolver_config,
         ),
     }
 }
@@ -88,6 +103,7 @@ fn install_single_package(
     engine_version_override: Option<String>,
     install_mode: InstallMode,
     dry_run: bool,
+    resolver_config: &ResolverConfig,
 ) -> Result<()> {
     // Parse package spec (e.g., "awesome-plugin" or "awesome-plugin@^1.2.0")
     let (package_name, version_constraint) = if let Some(pos) = package_spec.find('@') {
@@ -174,7 +190,7 @@ fn install_single_package(
     spinner.set_message("Resolving dependencies...");
     spinner.enable_steady_tick(std::time::Duration::from_millis(80));
 
-    let all_resolved = resolve_dependencies(&direct_deps, &registry, engine_version, force)?;
+    let all_resolved = resolve_dependencies(&direct_deps, &registry, engine_version, force, Some(resolver_config))?;
 
     let dep_count = all_resolved.len();
     if dep_count > 1 {
@@ -313,25 +329,32 @@ fn install_single_package(
                 let is_valid = verify_signature(&tarball_bytes, &signature_bytes, public_key)?;
 
                 if !is_valid {
-                    anyhow::bail!(
-                        "Signature verification FAILED for {}@{}\n\n\
-                        The package signature is invalid. This could mean:\n\
-                        • The package has been tampered with\n\
-                        • The signature file is corrupted\n\
-                        • The public key doesn't match\n\n\
-                        For your security, installation has been aborted.\n\
-                        If you trust this package, you can:\n\
-                        • Contact the package author\n\
-                        • Disable signature requirement: unrealpm config set verification.require_signatures false",
-                        package_name,
-                        resolved_version.version
+                    if config.verification.strict_verification {
+                        anyhow::bail!(
+                            "Signature verification FAILED for {}@{}\n\n\
+                            The package signature is invalid. This could mean:\n\
+                            • The package has been tampered with\n\
+                            • The signature file is corrupted\n\
+                            • The public key doesn't match\n\n\
+                            For your security, installation has been aborted.\n\
+                            If you trust this package, you can:\n\
+                            • Contact the package author\n\
+                            • Disable strict verification: unrealpm config set verification.strict_verification false",
+                            package_name,
+                            resolved_version.version
+                        );
+                    } else {
+                        println!(
+                            "  ⚠ WARNING: Signature verification failed for {}@{} - continuing anyway (strict_verification=false)",
+                            package_name, resolved_version.version
+                        );
+                    }
+                } else {
+                    println!(
+                        "  ✓ Signature verified (publisher: {}...)",
+                        &public_key[..16]
                     );
                 }
-
-                println!(
-                    "  ✓ Signature verified (publisher: {}...)",
-                    &public_key[..16]
-                );
             }
             Err(_) => {
                 // Signature download failed or file missing
@@ -444,6 +467,7 @@ fn install_all_dependencies(
     engine_version_override: Option<String>,
     _install_mode: InstallMode,
     dry_run: bool,
+    resolver_config: &ResolverConfig,
 ) -> Result<()> {
     if dry_run {
         println!("[DRY RUN] Would install all dependencies from manifest...");
@@ -492,7 +516,7 @@ fn install_all_dependencies(
     spinner.set_message("Resolving dependency tree...");
     spinner.enable_steady_tick(std::time::Duration::from_millis(80));
 
-    let resolved = resolve_dependencies(&manifest.dependencies, &registry, engine_version, force)?;
+    let resolved = resolve_dependencies(&manifest.dependencies, &registry, engine_version, force, Some(resolver_config))?;
 
     if force && engine_version.is_some() {
         println!("⚠ WARNING: Force installing - engine compatibility not checked");

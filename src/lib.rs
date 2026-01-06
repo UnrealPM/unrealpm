@@ -20,11 +20,11 @@
 //! let manifest = Manifest::load(".")?;
 //!
 //! // Create registry client
-//! let registry = RegistryClient::new(std::env::var("HOME").unwrap() + "/.unrealpm-registry");
+//! let registry = RegistryClient::new_default()?;
 //!
 //! // Resolve dependencies
 //! let engine_version = Some("5.3");
-//! let resolved = resolve_dependencies(&manifest.dependencies, &registry, engine_version, false)?;
+//! let resolved = resolve_dependencies(&manifest.dependencies, &registry, engine_version, false, None)?;
 //!
 //! println!("Resolved {} packages", resolved.len());
 //! # Ok(())
@@ -48,12 +48,13 @@ pub mod installer;
 pub mod lockfile;
 pub mod manifest;
 pub mod platform;
+pub mod pubgrub_resolver;
 pub mod registry;
 pub mod registry_http;
 pub mod resolver;
 pub mod signing;
 
-pub use config::Config;
+pub use config::{Config, ResolverConfig};
 pub use error::{Error, Result};
 pub use installer::{install_package, verify_checksum, ProgressCallback};
 pub use lockfile::{LockedPackage, Lockfile, LOCKFILE_NAME};

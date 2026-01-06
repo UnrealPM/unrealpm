@@ -57,6 +57,10 @@ pub struct Config {
     /// Authentication settings
     #[serde(default)]
     pub auth: AuthConfig,
+
+    /// Dependency resolver settings
+    #[serde(default)]
+    pub resolver: ResolverConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -138,11 +142,59 @@ fn default_public_key_path() -> String {
     "~/.unrealpm/keys/public_key.pem".to_string()
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VerificationConfig {
     /// Require signature verification when installing packages
     #[serde(default)]
     pub require_signatures: bool, // false for now (v0.3.0), true in v1.0.0
+
+    /// If true, fail on signature verification errors
+    /// If false, show warning and continue (useful for testing/development)
+    #[serde(default = "default_strict_verification")]
+    pub strict_verification: bool,
+}
+
+fn default_strict_verification() -> bool {
+    true
+}
+
+impl Default for VerificationConfig {
+    fn default() -> Self {
+        Self {
+            require_signatures: false,
+            strict_verification: default_strict_verification(),
+        }
+    }
+}
+
+/// Dependency resolver settings
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResolverConfig {
+    /// Maximum dependency depth to prevent infinite recursion (default: 100)
+    #[serde(default = "default_max_depth")]
+    pub max_depth: usize,
+
+    /// Show full derivation tree in conflict errors for debugging
+    #[serde(default)]
+    pub verbose_conflicts: bool,
+
+    /// Timeout for resolution in seconds (0 = no timeout)
+    #[serde(default)]
+    pub resolution_timeout_seconds: u64,
+}
+
+fn default_max_depth() -> usize {
+    100
+}
+
+impl Default for ResolverConfig {
+    fn default() -> Self {
+        Self {
+            max_depth: default_max_depth(),
+            verbose_conflicts: false,
+            resolution_timeout_seconds: 0,
+        }
+    }
 }
 
 impl Default for SigningConfig {
@@ -159,6 +211,19 @@ impl Default for SigningConfig {
 pub struct AuthConfig {
     /// API token for publishing to HTTP registry
     pub token: Option<String>,
+}
+
+impl AuthConfig {
+    /// Format authorization header based on token type
+    /// API tokens (starting with "urpm_") use "Token <token>" format
+    /// JWT session tokens use "Bearer <token>" format
+    pub fn format_auth_header(token: &str) -> String {
+        if token.starts_with("urpm_") {
+            format!("Token {}", token)
+        } else {
+            format!("Bearer {}", token)
+        }
+    }
 }
 
 impl Default for Config {
@@ -178,6 +243,7 @@ impl Default for Config {
             signing: SigningConfig::default(),
             verification: VerificationConfig::default(),
             auth: AuthConfig::default(),
+            resolver: ResolverConfig::default(),
         }
     }
 }
@@ -220,16 +286,28 @@ impl Config {
     }
 
     /// Load config from file, or create default if it doesn't exist
+    ///
+    /// Environment variable overrides:
+    /// - `UNREALPM_TOKEN`: Overrides `auth.token` for API authentication
+    /// - `UNREALPM_CONFIG_DIR`: Overrides the config directory location
     pub fn load() -> Result<Self> {
         let path = Self::default_path()?;
 
-        if !path.exists() {
+        let mut config = if !path.exists() {
             // Return default config
-            return Ok(Self::default());
+            Self::default()
+        } else {
+            let content = fs::read_to_string(&path)?;
+            toml::from_str(&content)?
+        };
+
+        // Override auth token from environment if set
+        if let Ok(token) = std::env::var("UNREALPM_TOKEN") {
+            if !token.is_empty() {
+                config.auth.token = Some(token);
+            }
         }
 
-        let content = fs::read_to_string(&path)?;
-        let config: Config = toml::from_str(&content)?;
         Ok(config)
     }
 

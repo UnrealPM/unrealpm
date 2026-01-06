@@ -1,8 +1,7 @@
 //! Dependency resolution with semantic versioning support
 //!
-//! This module provides dependency resolution functionality using a simple
-//! backtracking algorithm with semantic versioning. Phase 2 will migrate to
-//! the PubGrub algorithm for better conflict resolution.
+//! This module provides dependency resolution functionality using the PubGrub
+//! algorithm for superior conflict resolution and error messages.
 //!
 //! # Examples
 //!
@@ -11,19 +10,24 @@
 //! use std::collections::HashMap;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let registry = RegistryClient::new(std::env::var("HOME").unwrap() + "/.unrealpm-registry");
+//! let registry = RegistryClient::new_default()?;
 //! let mut dependencies = HashMap::new();
 //! dependencies.insert("awesome-plugin".to_string(), "^1.0.0".to_string());
 //!
-//! let resolved = resolve_dependencies(&dependencies, &registry, Some("5.3"), false)?;
+//! let resolved = resolve_dependencies(&dependencies, &registry, Some("5.3"), false, None)?;
 //! println!("Resolved {} packages", resolved.len());
 //! # Ok(())
 //! # }
 //! ```
 
-use crate::{Error, PackageMetadata, PackageVersion, RegistryClient, Result};
+use crate::{Error, PackageMetadata, PackageVersion, RegistryClient, ResolverConfig, Result};
 use semver::{Version, VersionReq};
 use std::collections::{HashMap, HashSet};
+
+// Re-export the PubGrub-based resolver
+pub use crate::pubgrub_resolver::{
+    resolve_dependencies as pubgrub_resolve_dependencies, ResolvedPackage,
+};
 
 /// Find the best matching version for a version constraint
 ///
@@ -43,7 +47,7 @@ use std::collections::{HashMap, HashSet};
 /// use unrealpm::{find_matching_version, RegistryClient};
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// let registry = RegistryClient::new(std::env::var("HOME").unwrap() + "/.unrealpm-registry");
+/// let registry = RegistryClient::new_default()?;
 /// let metadata = registry.get_package("awesome-plugin")?;
 ///
 /// let version = find_matching_version(&metadata, "^1.0.0", Some("5.3"), false)?;
@@ -195,89 +199,27 @@ pub fn find_matching_version(
     Ok(matching_versions[0].1.clone())
 }
 
-/// Resolved package with exact version
-#[derive(Debug, Clone)]
-pub struct ResolvedPackage {
-    pub name: String,
-    pub version: String,
-    pub checksum: String,
-    pub dependencies: Option<HashMap<String, String>>,
-}
-
 /// Resolve all transitive dependencies for a set of direct dependencies
 ///
-/// Returns a map of package name to resolved version
-/// Uses simple backtracking for MVP - will be replaced with PubGrub in Phase 2
+/// Returns a map of package name to resolved version.
+/// Uses PubGrub algorithm for optimal resolution and clear conflict messages.
+///
+/// # Arguments
+///
+/// * `direct_deps` - Map of package names to version constraints
+/// * `registry` - Registry client to fetch package metadata
+/// * `engine_version` - Optional engine version for filtering
+/// * `force` - If true, bypasses engine compatibility checks
+/// * `config` - Optional resolver configuration for timeouts, verbosity, etc.
 pub fn resolve_dependencies(
     direct_deps: &HashMap<String, String>,
     registry: &RegistryClient,
     engine_version: Option<&str>,
     force: bool,
+    config: Option<&ResolverConfig>,
 ) -> Result<HashMap<String, ResolvedPackage>> {
-    let mut resolved: HashMap<String, ResolvedPackage> = HashMap::new();
-    let mut visited: HashSet<String> = HashSet::new();
-    let mut to_visit: Vec<(String, String)> = direct_deps
-        .iter()
-        .map(|(name, version)| (name.clone(), version.clone()))
-        .collect();
-
-    while let Some((package_name, version_constraint)) = to_visit.pop() {
-        // Skip if already visited
-        if visited.contains(&package_name) {
-            // Check for version conflicts
-            if let Some(_existing) = resolved.get(&package_name) {
-                // For MVP, we'll just skip if already resolved
-                // Phase 2 will have proper conflict resolution
-                continue;
-            }
-            continue;
-        }
-
-        visited.insert(package_name.clone());
-
-        // Get package metadata from registry
-        let metadata = registry.get_package(&package_name)?;
-
-        // Find matching version with engine filtering
-        let resolved_version =
-            find_matching_version(&metadata, &version_constraint, engine_version, force)?;
-
-        // Get dependencies - if not in metadata, fetch from registry
-        let dependencies = if resolved_version.dependencies.is_some() {
-            resolved_version.dependencies.clone()
-        } else {
-            // Fetch dependencies from version detail endpoint (for HTTP registry)
-            registry
-                .get_version_dependencies(&package_name, &resolved_version.version)
-                .unwrap_or(None)
-        };
-
-        // Add transitive dependencies to the queue
-        if let Some(deps) = &dependencies {
-            for dep in deps {
-                if !visited.contains(&dep.name) {
-                    to_visit.push((dep.name.clone(), dep.version.clone()));
-                }
-            }
-        }
-
-        // Store resolved package
-        resolved.insert(
-            package_name.clone(),
-            ResolvedPackage {
-                name: package_name.clone(),
-                version: resolved_version.version.clone(),
-                checksum: resolved_version.checksum.clone(),
-                dependencies: dependencies.as_ref().map(|deps| {
-                    deps.iter()
-                        .map(|d| (d.name.clone(), d.version.clone()))
-                        .collect()
-                }),
-            },
-        );
-    }
-
-    Ok(resolved)
+    // Delegate to PubGrub-based resolver
+    pubgrub_resolve_dependencies(direct_deps, registry, engine_version, force, config)
 }
 
 /// Detect circular dependencies in a dependency graph
@@ -322,8 +264,10 @@ pub fn detect_circular_deps(
     Ok(())
 }
 
-/// Simple version resolver for MVP
-/// This is a basic implementation - will be replaced with PubGrub in Phase 2
+/// Version resolver using PubGrub algorithm
+///
+/// Note: This struct is kept for API compatibility but the actual resolution
+/// is now done through the `resolve_dependencies` function which uses PubGrub.
 pub struct Resolver;
 
 impl Resolver {

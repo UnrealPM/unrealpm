@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use serde::Deserialize;
-use unrealpm::Config;
+use unrealpm::{config::AuthConfig, Config};
 
 #[derive(Debug, Deserialize)]
 struct UserInfoResponse {
@@ -35,7 +35,7 @@ pub fn run() -> Result<()> {
 
     let response = client
         .get(&url)
-        .header("Authorization", format!("Bearer {}", auth_token))
+        .header("Authorization", AuthConfig::format_auth_header(auth_token))
         .send()
         .context("Failed to get user info")?;
 

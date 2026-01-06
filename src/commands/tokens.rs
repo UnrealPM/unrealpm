@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::io::{self, Write};
-use unrealpm::Config;
+use unrealpm::{config::AuthConfig, Config};
 
 #[derive(Debug, Serialize)]
 struct CreateTokenRequest {
@@ -73,7 +73,7 @@ pub fn run_create(name: String, scopes: Vec<String>, expires_days: Option<i64>) 
 
     let response = client
         .post(&url)
-        .header("Authorization", format!("Bearer {}", auth_token))
+        .header("Authorization", AuthConfig::format_auth_header(auth_token))
         .json(&request_body)
         .send()
         .context("Failed to create token")?;
@@ -138,7 +138,7 @@ pub fn run_list() -> Result<()> {
 
     let response = client
         .get(&url)
-        .header("Authorization", format!("Bearer {}", auth_token))
+        .header("Authorization", AuthConfig::format_auth_header(auth_token))
         .send()
         .context("Failed to list tokens")?;
 
@@ -222,7 +222,7 @@ pub fn run_revoke(token_id: String) -> Result<()> {
 
     let response = client
         .delete(&url)
-        .header("Authorization", format!("Bearer {}", auth_token))
+        .header("Authorization", AuthConfig::format_auth_header(auth_token))
         .send()
         .context("Failed to revoke token")?;
 

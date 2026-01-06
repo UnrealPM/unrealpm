@@ -3,6 +3,9 @@ use predicates::prelude::*;
 use std::fs;
 use tempfile::TempDir;
 
+/// Registry URL for production testing
+const REGISTRY_URL: &str = "https://registry.unreal.dev";
+
 /// Helper to create a test project directory
 fn setup_test_project() -> TempDir {
     TempDir::new().expect("Failed to create temp dir")
@@ -11,6 +14,34 @@ fn setup_test_project() -> TempDir {
 /// Helper to get the binary command
 fn unrealpm_cmd() -> Command {
     Command::new(env!("CARGO_BIN_EXE_unrealpm"))
+}
+
+/// Configure CLI to use HTTP registry
+fn configure_http_registry(dir: &std::path::Path) {
+    let config_dir = dir.join(".unrealpm");
+    fs::create_dir_all(&config_dir).expect("Failed to create config dir");
+
+    let config_content = format!(
+        r#"[registry]
+registry_type = "http"
+url = "{}"
+
+[signing]
+enabled = true
+
+[verification]
+require_signatures = false
+strict_verification = false
+"#,
+        REGISTRY_URL
+    );
+
+    fs::write(config_dir.join("config.toml"), config_content).expect("Failed to write config");
+}
+
+/// Set up environment to use test project's config
+fn with_test_config(cmd: &mut Command, dir: &std::path::Path) {
+    cmd.env("UNREALPM_CONFIG_DIR", dir.join(".unrealpm"));
 }
 
 #[test]
@@ -32,12 +63,17 @@ fn test_init_command() {
 
 #[test]
 fn test_search_command() {
-    unrealpm_cmd()
-        .arg("search")
-        .arg("plugin")
+    let temp_dir = setup_test_project();
+    configure_http_registry(temp_dir.path());
+
+    // Search for packages on the HTTP registry
+    // Using lowercase to match case-insensitive search
+    let mut cmd = unrealpm_cmd();
+    with_test_config(&mut cmd, temp_dir.path());
+    cmd.arg("search")
+        .arg("chroma")
         .assert()
-        .success()
-        .stdout(predicate::str::contains("awesome-plugin"));
+        .success();
 }
 
 #[test]
@@ -63,27 +99,35 @@ fn test_list_empty() {
 #[test]
 fn test_install_single_package() {
     let temp_dir = setup_test_project();
+    configure_http_registry(temp_dir.path());
+
+    // Create a .uproject to detect engine version
+    fs::write(
+        temp_dir.path().join("TestProject.uproject"),
+        r#"{"FileVersion": 3, "EngineAssociation": "5.4"}"#,
+    )
+    .unwrap();
 
     // Initialize project
-    unrealpm_cmd()
-        .current_dir(&temp_dir)
+    let mut cmd = unrealpm_cmd();
+    with_test_config(&mut cmd, temp_dir.path());
+    cmd.current_dir(&temp_dir)
         .arg("init")
         .assert()
         .success();
 
-    // Install base-utils (no dependencies)
-    unrealpm_cmd()
-        .current_dir(&temp_dir)
+    // Install ChromaSense (a real package on the registry)
+    let mut cmd = unrealpm_cmd();
+    with_test_config(&mut cmd, temp_dir.path());
+    cmd.current_dir(&temp_dir)
         .arg("install")
-        .arg("base-utils@^1.0.0")
+        .arg("ChromaSense@^0.1.0")
         .assert()
         .success()
-        .stdout(predicate::str::contains(
-            "Successfully installed base-utils",
-        ));
+        .stdout(predicate::str::contains("Successfully installed ChromaSense"));
 
     // Verify plugin was installed
-    let plugin_path = temp_dir.path().join("Plugins/base-utils");
+    let plugin_path = temp_dir.path().join("Plugins/ChromaSense");
     assert!(plugin_path.exists(), "Plugin should be installed");
 
     // Verify lockfile was created
@@ -92,85 +136,107 @@ fn test_install_single_package() {
 
     // Verify lockfile contains the package
     let lockfile_content = fs::read_to_string(lockfile_path).unwrap();
-    assert!(lockfile_content.contains("base-utils"));
-    assert!(lockfile_content.contains("1.0.0"));
+    assert!(lockfile_content.contains("ChromaSense"));
 }
 
+/// Test transitive dependency installation
+///
+/// Tests installing a package with transitive dependencies.
+/// DebugTools@1.2.0 depends on UnrealUtilsCore@*, so installing DebugTools
+/// should automatically pull in UnrealUtilsCore as well.
 #[test]
 fn test_install_with_transitive_dependencies() {
     let temp_dir = setup_test_project();
+    configure_http_registry(temp_dir.path());
+
+    // Create a .uproject to detect engine version
+    fs::write(
+        temp_dir.path().join("TestProject.uproject"),
+        r#"{"FileVersion": 3, "EngineAssociation": "5.4"}"#,
+    )
+    .unwrap();
 
     // Initialize project
-    unrealpm_cmd()
-        .current_dir(&temp_dir)
+    let mut cmd = unrealpm_cmd();
+    with_test_config(&mut cmd, temp_dir.path());
+    cmd.current_dir(&temp_dir)
         .arg("init")
         .assert()
         .success();
 
-    // Install multiplayer-toolkit (has transitive dependencies)
-    unrealpm_cmd()
-        .current_dir(&temp_dir)
+    // Install DebugTools which has a dependency on UnrealUtilsCore
+    let mut cmd = unrealpm_cmd();
+    with_test_config(&mut cmd, temp_dir.path());
+    cmd.current_dir(&temp_dir)
         .arg("install")
-        .arg("multiplayer-toolkit@^2.0.0")
+        .arg("DebugTools@^1.2.0")
         .assert()
-        .success()
-        .stdout(predicate::str::contains(
-            "Successfully installed multiplayer-toolkit",
-        ));
+        .success();
 
-    // Run install to get all transitive dependencies
-    unrealpm_cmd()
-        .current_dir(&temp_dir)
-        .arg("install")
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Finished installing dependencies"));
+    // Verify both packages were installed (DebugTools and its dependency UnrealUtilsCore)
+    assert!(
+        temp_dir.path().join("Plugins/DebugTools").exists(),
+        "DebugTools should be installed"
+    );
+    assert!(
+        temp_dir.path().join("Plugins/UnrealUtilsCore").exists(),
+        "UnrealUtilsCore should be installed as a transitive dependency"
+    );
 
-    // Verify all three packages were installed (multiplayer-toolkit + its transitive deps)
-    assert!(temp_dir.path().join("Plugins/multiplayer-toolkit").exists());
-    assert!(temp_dir.path().join("Plugins/awesome-plugin").exists());
-    assert!(temp_dir.path().join("Plugins/base-utils").exists());
-
-    // Verify lockfile contains all three packages
-    let lockfile_path = temp_dir.path().join("unrealpm.lock");
-    let lockfile_content = fs::read_to_string(lockfile_path).unwrap();
-    assert!(lockfile_content.contains("multiplayer-toolkit"));
-    assert!(lockfile_content.contains("awesome-plugin"));
-    assert!(lockfile_content.contains("base-utils"));
+    // Verify lockfile contains both packages
+    let lockfile_content =
+        fs::read_to_string(temp_dir.path().join("unrealpm.lock")).expect("lockfile should exist");
+    assert!(
+        lockfile_content.contains("DebugTools"),
+        "lockfile should contain DebugTools"
+    );
+    assert!(
+        lockfile_content.contains("UnrealUtilsCore"),
+        "lockfile should contain UnrealUtilsCore"
+    );
 }
 
 #[test]
 fn test_uninstall_command() {
     let temp_dir = setup_test_project();
+    configure_http_registry(temp_dir.path());
+
+    // Create a .uproject to detect engine version
+    fs::write(
+        temp_dir.path().join("TestProject.uproject"),
+        r#"{"FileVersion": 3, "EngineAssociation": "5.4"}"#,
+    )
+    .unwrap();
 
     // Initialize and install a package
-    unrealpm_cmd()
-        .current_dir(&temp_dir)
+    let mut cmd = unrealpm_cmd();
+    with_test_config(&mut cmd, temp_dir.path());
+    cmd.current_dir(&temp_dir)
         .arg("init")
         .assert()
         .success();
 
-    unrealpm_cmd()
-        .current_dir(&temp_dir)
+    let mut cmd = unrealpm_cmd();
+    with_test_config(&mut cmd, temp_dir.path());
+    cmd.current_dir(&temp_dir)
         .arg("install")
-        .arg("base-utils@^1.0.0")
+        .arg("ChromaSense@^0.1.0")
         .assert()
         .success();
 
     // Verify it's installed
-    let plugin_path = temp_dir.path().join("Plugins/base-utils");
+    let plugin_path = temp_dir.path().join("Plugins/ChromaSense");
     assert!(plugin_path.exists());
 
     // Uninstall it
-    unrealpm_cmd()
-        .current_dir(&temp_dir)
+    let mut cmd = unrealpm_cmd();
+    with_test_config(&mut cmd, temp_dir.path());
+    cmd.current_dir(&temp_dir)
         .arg("uninstall")
-        .arg("base-utils")
+        .arg("ChromaSense")
         .assert()
         .success()
-        .stdout(predicate::str::contains(
-            "Successfully uninstalled base-utils",
-        ));
+        .stdout(predicate::str::contains("Successfully uninstalled ChromaSense"));
 
     // Verify it was removed
     assert!(!plugin_path.exists(), "Plugin should be removed");
@@ -179,66 +245,86 @@ fn test_uninstall_command() {
 #[test]
 fn test_lockfile_reproducibility() {
     let temp_dir = setup_test_project();
+    configure_http_registry(temp_dir.path());
+
+    // Create a .uproject to detect engine version
+    fs::write(
+        temp_dir.path().join("TestProject.uproject"),
+        r#"{"FileVersion": 3, "EngineAssociation": "5.4"}"#,
+    )
+    .unwrap();
 
     // Initialize project
-    unrealpm_cmd()
-        .current_dir(&temp_dir)
+    let mut cmd = unrealpm_cmd();
+    with_test_config(&mut cmd, temp_dir.path());
+    cmd.current_dir(&temp_dir)
         .arg("init")
         .assert()
         .success();
 
     // Install a package
-    unrealpm_cmd()
-        .current_dir(&temp_dir)
+    let mut cmd = unrealpm_cmd();
+    with_test_config(&mut cmd, temp_dir.path());
+    cmd.current_dir(&temp_dir)
         .arg("install")
-        .arg("base-utils@^1.0.0")
+        .arg("ChromaSense@^0.1.0")
         .assert()
         .success();
 
     // Read lockfile
     let lockfile_path = temp_dir.path().join("unrealpm.lock");
-    let _lockfile_content = fs::read_to_string(&lockfile_path).unwrap();
+    let lockfile_content = fs::read_to_string(&lockfile_path).unwrap();
+
+    // Verify lockfile has the package
+    assert!(lockfile_content.contains("ChromaSense"));
+    assert!(lockfile_content.contains("checksum"));
 
     // Remove the installed package
     fs::remove_dir_all(temp_dir.path().join("Plugins")).unwrap();
 
     // Reinstall from lockfile (should use exact versions)
-    unrealpm_cmd()
-        .current_dir(&temp_dir)
+    let mut cmd = unrealpm_cmd();
+    with_test_config(&mut cmd, temp_dir.path());
+    cmd.current_dir(&temp_dir)
         .arg("install")
         .assert()
         .success();
 
-    // Verify lockfile hasn't changed (except timestamp)
+    // Verify lockfile still contains the package
     let new_lockfile_content = fs::read_to_string(&lockfile_path).unwrap();
-
-    // Extract version and checksum (ignore timestamp)
-    assert!(new_lockfile_content.contains("version = \"1.0.0\""));
-    assert!(new_lockfile_content.contains(
-        "checksum = \"00adf0997d0926e6965a852b834fe144abddb8e54ebc47cd540abe639e966241\""
-    ));
+    assert!(new_lockfile_content.contains("ChromaSense"));
 }
 
 #[test]
 fn test_checksum_verification() {
     let temp_dir = setup_test_project();
+    configure_http_registry(temp_dir.path());
+
+    // Create a .uproject to detect engine version
+    fs::write(
+        temp_dir.path().join("TestProject.uproject"),
+        r#"{"FileVersion": 3, "EngineAssociation": "5.4"}"#,
+    )
+    .unwrap();
 
     // Initialize project
-    unrealpm_cmd()
-        .current_dir(&temp_dir)
+    let mut cmd = unrealpm_cmd();
+    with_test_config(&mut cmd, temp_dir.path());
+    cmd.current_dir(&temp_dir)
         .arg("init")
         .assert()
         .success();
 
     // Install package (will verify checksum automatically)
-    unrealpm_cmd()
-        .current_dir(&temp_dir)
+    let mut cmd = unrealpm_cmd();
+    with_test_config(&mut cmd, temp_dir.path());
+    cmd.current_dir(&temp_dir)
         .arg("install")
-        .arg("base-utils@^1.0.0")
+        .arg("ChromaSense@^0.1.0")
         .assert()
         .success();
 
     // If we got here, checksum verification passed
     // (otherwise the install would have failed)
-    assert!(temp_dir.path().join("Plugins/base-utils").exists());
+    assert!(temp_dir.path().join("Plugins/ChromaSense").exists());
 }

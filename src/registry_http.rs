@@ -51,6 +51,17 @@ impl HttpRegistryClient {
         })
     }
 
+    /// Format authorization header based on token type
+    /// API tokens (starting with "urpm_") use "Token <token>" format
+    /// JWT tokens use "Bearer <token>" format
+    fn format_auth_header(token: &str) -> String {
+        if token.starts_with("urpm_") {
+            format!("Token {}", token)
+        } else {
+            format!("Bearer {}", token)
+        }
+    }
+
     /// Get package metadata from HTTP registry
     pub fn get_package(&self, name: &str) -> Result<PackageMetadata> {
         let url = format!("{}/api/v1/packages/{}", self.base_url, name);
@@ -325,7 +336,7 @@ impl HttpRegistryClient {
         let mut request = self.client.post(&url).multipart(form);
 
         if let Some(token) = &self.api_token {
-            request = request.header("Authorization", format!("Bearer {}", token));
+            request = request.header("Authorization", Self::format_auth_header(token));
         }
 
         let response = request.send()
@@ -408,7 +419,7 @@ impl HttpRegistryClient {
         let mut request = self.client.delete(&url);
 
         if let Some(token) = &self.api_token {
-            request = request.header("Authorization", format!("Bearer {}", token));
+            request = request.header("Authorization", Self::format_auth_header(token));
         }
 
         let response = request
@@ -443,7 +454,7 @@ impl HttpRegistryClient {
         };
 
         if let Some(token) = &self.api_token {
-            request = request.header("Authorization", format!("Bearer {}", token));
+            request = request.header("Authorization", Self::format_auth_header(token));
         }
 
         let response = request

@@ -1,7 +1,7 @@
 //! Package registry client and metadata types
 //!
-//! This module provides a file-based registry client for MVP.
-//! Phase 2 will migrate to an HTTP-based registry with PostgreSQL backend.
+//! This module provides both file-based and HTTP registry clients.
+//! Use `RegistryClient::new_default()` to get a client based on your config.
 //!
 //! # Examples
 //!
@@ -9,7 +9,7 @@
 //! use unrealpm::RegistryClient;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let registry = RegistryClient::new(std::env::var("HOME").unwrap() + "/.unrealpm-registry");
+//! let registry = RegistryClient::new_default()?;
 //!
 //! // Search for packages
 //! let results = registry.search("multiplayer")?;
