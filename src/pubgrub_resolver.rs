@@ -117,11 +117,7 @@ pub struct UnrealPmDependencyProvider<'a> {
 }
 
 impl<'a> UnrealPmDependencyProvider<'a> {
-    pub fn new(
-        registry: &'a RegistryClient,
-        engine_version: Option<&str>,
-        force: bool,
-    ) -> Self {
+    pub fn new(registry: &'a RegistryClient, engine_version: Option<&str>, force: bool) -> Self {
         Self {
             registry,
             engine_version: engine_version.map(|s| s.to_string()),
@@ -497,7 +493,8 @@ pub fn resolve_dependencies(
     let provider = UnrealPmDependencyProvider::new(registry, engine_version, force);
 
     // Build the root dependencies
-    let mut root_deps: DependencyConstraints<String, VersionRange> = DependencyConstraints::default();
+    let mut root_deps: DependencyConstraints<String, VersionRange> =
+        DependencyConstraints::default();
 
     for (name, constraint) in direct_deps {
         let range = provider.parse_version_constraint(constraint)?;
@@ -628,10 +625,7 @@ impl<'a> DependencyProvider for RootDependencyProvider<'a> {
 ///
 /// * `error` - The PubGrub error to convert
 /// * `verbose` - If true, show full derivation tree without collapsing
-fn convert_pubgrub_error<DP: DependencyProvider>(
-    error: PubGrubError<DP>,
-    verbose: bool,
-) -> Error
+fn convert_pubgrub_error<DP: DependencyProvider>(error: PubGrubError<DP>, verbose: bool) -> Error
 where
     DP::P: Display,
     DP::VS: Display,
@@ -795,12 +789,10 @@ pub fn find_matching_version(
     }
 
     // Sort by engine specificity first, then version
-    matching_versions.sort_by(|a, b| {
-        match (a.1.is_multi_engine, b.1.is_multi_engine) {
-            (false, true) => std::cmp::Ordering::Less,
-            (true, false) => std::cmp::Ordering::Greater,
-            _ => b.0.cmp(&a.0),
-        }
+    matching_versions.sort_by(|a, b| match (a.1.is_multi_engine, b.1.is_multi_engine) {
+        (false, true) => std::cmp::Ordering::Less,
+        (true, false) => std::cmp::Ordering::Greater,
+        _ => b.0.cmp(&a.0),
     });
 
     Ok(matching_versions[0].1.clone())
@@ -812,10 +804,7 @@ mod tests {
 
     #[test]
     fn test_sem_version_parse() {
-        assert_eq!(
-            SemVersion::parse("1.2.3"),
-            Some(SemVersion::new(1, 2, 3))
-        );
+        assert_eq!(SemVersion::parse("1.2.3"), Some(SemVersion::new(1, 2, 3)));
         assert_eq!(SemVersion::parse("1.2"), Some(SemVersion::new(1, 2, 0)));
         assert_eq!(SemVersion::parse("invalid"), None);
     }

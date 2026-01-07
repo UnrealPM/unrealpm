@@ -4,8 +4,8 @@ use std::env;
 use std::sync::Arc;
 use unrealpm::{
     find_matching_version, install_package, resolve_dependencies, verify_checksum,
-    verify_signature, Config, Lockfile, Manifest, PrebuiltBinary, ProgressCallback,
-    RegistryClient, ResolverConfig,
+    verify_signature, Config, Lockfile, Manifest, PrebuiltBinary, ProgressCallback, RegistryClient,
+    ResolverConfig,
 };
 
 /// Create an indicatif-based progress callback for CLI display
@@ -190,7 +190,13 @@ fn install_single_package(
     spinner.set_message("Resolving dependencies...");
     spinner.enable_steady_tick(std::time::Duration::from_millis(80));
 
-    let all_resolved = resolve_dependencies(&direct_deps, &registry, engine_version, force, Some(resolver_config))?;
+    let all_resolved = resolve_dependencies(
+        &direct_deps,
+        &registry,
+        engine_version,
+        force,
+        Some(resolver_config),
+    )?;
 
     let dep_count = all_resolved.len();
     if dep_count > 1 {
@@ -516,7 +522,13 @@ fn install_all_dependencies(
     spinner.set_message("Resolving dependency tree...");
     spinner.enable_steady_tick(std::time::Duration::from_millis(80));
 
-    let resolved = resolve_dependencies(&manifest.dependencies, &registry, engine_version, force, Some(resolver_config))?;
+    let resolved = resolve_dependencies(
+        &manifest.dependencies,
+        &registry,
+        engine_version,
+        force,
+        Some(resolver_config),
+    )?;
 
     if force && engine_version.is_some() {
         println!("⚠ WARNING: Force installing - engine compatibility not checked");

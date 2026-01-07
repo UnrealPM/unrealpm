@@ -569,7 +569,9 @@ mod authenticated {
 
     /// Helper to check if auth token is available
     fn get_auth_token() -> Option<String> {
-        std::env::var("UNREALPM_TOKEN").ok().filter(|t| !t.is_empty())
+        std::env::var("UNREALPM_TOKEN")
+            .ok()
+            .filter(|t| !t.is_empty())
     }
 
     /// Helper to skip test if no token

@@ -36,16 +36,16 @@ mod version_constraints {
         let registry = TestRegistry::new();
 
         // Add versions: 1.0.0, 1.5.0, 2.0.0
-        let plugin_v1 = MockPlugin::new("versioned-pkg", "1.0.0")
-            .with_engine_versions(vec!["5.3", "5.4"]);
+        let plugin_v1 =
+            MockPlugin::new("versioned-pkg", "1.0.0").with_engine_versions(vec!["5.3", "5.4"]);
         registry.add_package(&plugin_v1);
 
-        let plugin_v15 = MockPlugin::new("versioned-pkg", "1.5.0")
-            .with_engine_versions(vec!["5.3", "5.4"]);
+        let plugin_v15 =
+            MockPlugin::new("versioned-pkg", "1.5.0").with_engine_versions(vec!["5.3", "5.4"]);
         registry.add_package(&plugin_v15);
 
-        let plugin_v2 = MockPlugin::new("versioned-pkg", "2.0.0")
-            .with_engine_versions(vec!["5.3", "5.4"]);
+        let plugin_v2 =
+            MockPlugin::new("versioned-pkg", "2.0.0").with_engine_versions(vec!["5.3", "5.4"]);
         registry.add_package(&plugin_v2);
 
         // Verify the registry was set up correctly
@@ -60,8 +60,7 @@ mod version_constraints {
 
         let registry = TestRegistry::new();
 
-        let plugin = MockPlugin::new("tilde-pkg", "1.2.3")
-            .with_engine_versions(vec!["5.3"]);
+        let plugin = MockPlugin::new("tilde-pkg", "1.2.3").with_engine_versions(vec!["5.3"]);
         registry.add_package(&plugin);
 
         assert!(registry.packages_dir.join("tilde-pkg.json").exists());
@@ -74,8 +73,7 @@ mod version_constraints {
 
         let registry = TestRegistry::new();
 
-        let plugin = MockPlugin::new("exact-pkg", "1.2.3")
-            .with_engine_versions(vec!["5.3"]);
+        let plugin = MockPlugin::new("exact-pkg", "1.2.3").with_engine_versions(vec!["5.3"]);
         registry.add_package(&plugin);
 
         assert!(registry.packages_dir.join("exact-pkg.json").exists());
@@ -88,8 +86,7 @@ mod version_constraints {
 
         let registry = TestRegistry::new();
 
-        let plugin = MockPlugin::new("any-pkg", "1.0.0")
-            .with_engine_versions(vec!["5.3"]);
+        let plugin = MockPlugin::new("any-pkg", "1.0.0").with_engine_versions(vec!["5.3"]);
         registry.add_package(&plugin);
 
         assert!(registry.packages_dir.join("any-pkg.json").exists());
@@ -108,8 +105,7 @@ mod dependency_chains {
         let registry = TestRegistry::new();
 
         // C has no dependencies
-        let pkg_c = MockPlugin::new("pkg-c", "1.0.0")
-            .with_engine_versions(vec!["5.3", "5.4"]);
+        let pkg_c = MockPlugin::new("pkg-c", "1.0.0").with_engine_versions(vec!["5.3", "5.4"]);
         registry.add_package(&pkg_c);
 
         // B depends on C
@@ -141,8 +137,7 @@ mod dependency_chains {
         let registry = TestRegistry::new();
 
         // D is the base (no dependencies)
-        let pkg_d = MockPlugin::new("pkg-d", "1.0.0")
-            .with_engine_versions(vec!["5.3"]);
+        let pkg_d = MockPlugin::new("pkg-d", "1.0.0").with_engine_versions(vec!["5.3"]);
         registry.add_package(&pkg_d);
 
         // B depends on D
@@ -190,18 +185,18 @@ mod engine_version {
         let registry = TestRegistry::new();
 
         // Package only available for 5.3
-        let plugin_53 = MockPlugin::new("engine-53-only", "1.0.0")
-            .with_engine_versions(vec!["5.3"]);
+        let plugin_53 =
+            MockPlugin::new("engine-53-only", "1.0.0").with_engine_versions(vec!["5.3"]);
         registry.add_package(&plugin_53);
 
         // Package only available for 5.4
-        let plugin_54 = MockPlugin::new("engine-54-only", "1.0.0")
-            .with_engine_versions(vec!["5.4"]);
+        let plugin_54 =
+            MockPlugin::new("engine-54-only", "1.0.0").with_engine_versions(vec!["5.4"]);
         registry.add_package(&plugin_54);
 
         // Package available for both
-        let plugin_both = MockPlugin::new("engine-multi", "1.0.0")
-            .with_engine_versions(vec!["5.3", "5.4"]);
+        let plugin_both =
+            MockPlugin::new("engine-multi", "1.0.0").with_engine_versions(vec!["5.3", "5.4"]);
         registry.add_package(&plugin_both);
 
         assert!(registry.packages_dir.join("engine-53-only.json").exists());
@@ -238,12 +233,10 @@ mod conflicts {
         let registry = TestRegistry::new();
 
         // shared-dep has two versions
-        let shared_v1 = MockPlugin::new("shared-dep", "1.0.0")
-            .with_engine_versions(vec!["5.3"]);
+        let shared_v1 = MockPlugin::new("shared-dep", "1.0.0").with_engine_versions(vec!["5.3"]);
         registry.add_package(&shared_v1);
 
-        let shared_v2 = MockPlugin::new("shared-dep", "2.0.0")
-            .with_engine_versions(vec!["5.3"]);
+        let shared_v2 = MockPlugin::new("shared-dep", "2.0.0").with_engine_versions(vec!["5.3"]);
         registry.add_package(&shared_v2);
 
         // left-pkg requires shared-dep ^1.0.0
@@ -357,9 +350,7 @@ mod edge_cases {
         assert!(registry.signatures_dir.exists());
 
         // No package files
-        let entries: Vec<_> = fs::read_dir(&registry.packages_dir)
-            .unwrap()
-            .collect();
+        let entries: Vec<_> = fs::read_dir(&registry.packages_dir).unwrap().collect();
         assert!(entries.is_empty());
     }
 
@@ -367,8 +358,8 @@ mod edge_cases {
     fn test_package_with_no_dependencies() {
         let registry = TestRegistry::new();
 
-        let plugin = MockPlugin::new("standalone", "1.0.0")
-            .with_engine_versions(vec!["5.3", "5.4"]);
+        let plugin =
+            MockPlugin::new("standalone", "1.0.0").with_engine_versions(vec!["5.3", "5.4"]);
         registry.add_package(&plugin);
 
         assert!(registry.packages_dir.join("standalone.json").exists());
@@ -396,8 +387,7 @@ mod edge_cases {
         let depth = 10;
         for i in (0..depth).rev() {
             let plugin = if i == depth - 1 {
-                MockPlugin::new(&format!("deep-{}", i), "1.0.0")
-                    .with_engine_versions(vec!["5.3"])
+                MockPlugin::new(&format!("deep-{}", i), "1.0.0").with_engine_versions(vec!["5.3"])
             } else {
                 MockPlugin::new(&format!("deep-{}", i), "1.0.0")
                     .with_engine_versions(vec!["5.3"])
@@ -408,7 +398,10 @@ mod edge_cases {
 
         // Verify all packages exist
         for i in 0..depth {
-            assert!(registry.packages_dir.join(format!("deep-{}.json", i)).exists());
+            assert!(registry
+                .packages_dir
+                .join(format!("deep-{}.json", i))
+                .exists());
         }
     }
 }

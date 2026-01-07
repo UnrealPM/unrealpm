@@ -245,7 +245,13 @@ fn update_all_packages(
 
     // Resolve all dependencies (this will get latest matching versions)
     println!("Resolving latest versions...");
-    let resolved = resolve_dependencies(&manifest.dependencies, &registry, engine_version, false, Some(resolver_config))?;
+    let resolved = resolve_dependencies(
+        &manifest.dependencies,
+        &registry,
+        engine_version,
+        false,
+        Some(resolver_config),
+    )?;
     println!("  ✓ Resolved {} packages", resolved.len());
     println!();
 

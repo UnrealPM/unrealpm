@@ -70,10 +70,7 @@ fn test_search_command() {
     // Using lowercase to match case-insensitive search
     let mut cmd = unrealpm_cmd();
     with_test_config(&mut cmd, temp_dir.path());
-    cmd.arg("search")
-        .arg("chroma")
-        .assert()
-        .success();
+    cmd.arg("search").arg("chroma").assert().success();
 }
 
 #[test]
@@ -111,10 +108,7 @@ fn test_install_single_package() {
     // Initialize project
     let mut cmd = unrealpm_cmd();
     with_test_config(&mut cmd, temp_dir.path());
-    cmd.current_dir(&temp_dir)
-        .arg("init")
-        .assert()
-        .success();
+    cmd.current_dir(&temp_dir).arg("init").assert().success();
 
     // Install ChromaSense (a real package on the registry)
     let mut cmd = unrealpm_cmd();
@@ -124,7 +118,9 @@ fn test_install_single_package() {
         .arg("ChromaSense@^0.1.0")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Successfully installed ChromaSense"));
+        .stdout(predicate::str::contains(
+            "Successfully installed ChromaSense",
+        ));
 
     // Verify plugin was installed
     let plugin_path = temp_dir.path().join("Plugins/ChromaSense");
@@ -159,10 +155,7 @@ fn test_install_with_transitive_dependencies() {
     // Initialize project
     let mut cmd = unrealpm_cmd();
     with_test_config(&mut cmd, temp_dir.path());
-    cmd.current_dir(&temp_dir)
-        .arg("init")
-        .assert()
-        .success();
+    cmd.current_dir(&temp_dir).arg("init").assert().success();
 
     // Install DebugTools which has a dependency on UnrealUtilsCore
     let mut cmd = unrealpm_cmd();
@@ -211,10 +204,7 @@ fn test_uninstall_command() {
     // Initialize and install a package
     let mut cmd = unrealpm_cmd();
     with_test_config(&mut cmd, temp_dir.path());
-    cmd.current_dir(&temp_dir)
-        .arg("init")
-        .assert()
-        .success();
+    cmd.current_dir(&temp_dir).arg("init").assert().success();
 
     let mut cmd = unrealpm_cmd();
     with_test_config(&mut cmd, temp_dir.path());
@@ -236,7 +226,9 @@ fn test_uninstall_command() {
         .arg("ChromaSense")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Successfully uninstalled ChromaSense"));
+        .stdout(predicate::str::contains(
+            "Successfully uninstalled ChromaSense",
+        ));
 
     // Verify it was removed
     assert!(!plugin_path.exists(), "Plugin should be removed");
@@ -257,10 +249,7 @@ fn test_lockfile_reproducibility() {
     // Initialize project
     let mut cmd = unrealpm_cmd();
     with_test_config(&mut cmd, temp_dir.path());
-    cmd.current_dir(&temp_dir)
-        .arg("init")
-        .assert()
-        .success();
+    cmd.current_dir(&temp_dir).arg("init").assert().success();
 
     // Install a package
     let mut cmd = unrealpm_cmd();
@@ -285,10 +274,7 @@ fn test_lockfile_reproducibility() {
     // Reinstall from lockfile (should use exact versions)
     let mut cmd = unrealpm_cmd();
     with_test_config(&mut cmd, temp_dir.path());
-    cmd.current_dir(&temp_dir)
-        .arg("install")
-        .assert()
-        .success();
+    cmd.current_dir(&temp_dir).arg("install").assert().success();
 
     // Verify lockfile still contains the package
     let new_lockfile_content = fs::read_to_string(&lockfile_path).unwrap();
@@ -310,10 +296,7 @@ fn test_checksum_verification() {
     // Initialize project
     let mut cmd = unrealpm_cmd();
     with_test_config(&mut cmd, temp_dir.path());
-    cmd.current_dir(&temp_dir)
-        .arg("init")
-        .assert()
-        .success();
+    cmd.current_dir(&temp_dir).arg("init").assert().success();
 
     // Install package (will verify checksum automatically)
     let mut cmd = unrealpm_cmd();
