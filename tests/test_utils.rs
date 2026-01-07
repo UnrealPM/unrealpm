@@ -3,6 +3,8 @@
 //! This module provides common utilities for setting up test environments,
 //! creating test fixtures, and asserting test results.
 
+#![allow(dead_code)]
+
 use std::fs;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;

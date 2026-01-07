@@ -214,125 +214,127 @@ impl<'a> UnrealPmDependencyProvider<'a> {
 
     /// Convert a version constraint string to a Ranges<SemVersion>
     fn parse_version_constraint(&self, constraint: &str) -> Result<VersionRange> {
-        // Parse using semver crate
-        let req = VersionReq::parse(constraint).map_err(|e| {
+        // Validate using semver crate (ensures constraint is syntactically valid)
+        let _req = VersionReq::parse(constraint).map_err(|e| {
             Error::Other(format!(
                 "Invalid version constraint '{}': {}",
                 constraint, e
             ))
         })?;
 
-        // Convert semver::VersionReq to pubgrub Ranges
+        // Convert to pubgrub Ranges
         // This is a simplification - we convert common patterns
-        self.version_req_to_ranges(&req, constraint)
+        version_constraint_to_ranges(constraint)
+    }
+}
+
+/// Convert a version constraint string to pubgrub Ranges
+fn version_constraint_to_ranges(original: &str) -> Result<VersionRange> {
+    // Handle common patterns
+    if original == "*" {
+        return Ok(Ranges::full());
     }
 
-    /// Convert semver::VersionReq to pubgrub Ranges
-    fn version_req_to_ranges(&self, req: &VersionReq, original: &str) -> Result<VersionRange> {
-        // Handle common patterns
-        if original == "*" {
-            return Ok(Ranges::full());
-        }
+    // Parse the comparators from the original string since semver's internal representation
+    // isn't directly accessible in a useful way
+    let trimmed = original.trim();
 
-        // Parse the comparators from the original string since semver's internal representation
-        // isn't directly accessible in a useful way
-        let trimmed = original.trim();
-
-        // Handle caret (^) - compatible with version
-        if let Some(ver_str) = trimmed.strip_prefix('^') {
-            if let Some(base) = SemVersion::parse(ver_str) {
-                // ^1.2.3 means >=1.2.3, <2.0.0 for major > 0
-                // ^0.2.3 means >=0.2.3, <0.3.0 for major = 0, minor > 0
-                // ^0.0.3 means >=0.0.3, <0.0.4 for major = 0, minor = 0
-                let upper = if base.major > 0 {
-                    SemVersion::new(base.major + 1, 0, 0)
-                } else if base.minor > 0 {
-                    SemVersion::new(0, base.minor + 1, 0)
-                } else {
-                    SemVersion::new(0, 0, base.patch + 1)
-                };
-                return Ok(Ranges::from_range_bounds(base..upper));
-            }
-        }
-
-        // Handle tilde (~) - approximately equivalent
-        if let Some(ver_str) = trimmed.strip_prefix('~') {
-            if let Some(base) = SemVersion::parse(ver_str) {
-                // ~1.2.3 means >=1.2.3, <1.3.0
-                let upper = SemVersion::new(base.major, base.minor + 1, 0);
-                return Ok(Ranges::from_range_bounds(base..upper));
-            }
-        }
-
-        // Handle exact version (=)
-        if let Some(ver_str) = trimmed.strip_prefix('=') {
-            if let Some(v) = SemVersion::parse(ver_str.trim()) {
-                return Ok(Ranges::singleton(v));
-            }
-        }
-
-        // Handle >= (greater than or equal)
-        if let Some(ver_str) = trimmed.strip_prefix(">=") {
-            if let Some(v) = SemVersion::parse(ver_str.trim()) {
-                return Ok(Ranges::from_range_bounds(v..));
-            }
-        }
-
-        // Handle > (greater than)
-        if let Some(ver_str) = trimmed.strip_prefix('>') {
-            if let Some(v) = SemVersion::parse(ver_str.trim()) {
-                // Convert > to >= next patch
-                let next = SemVersion::new(v.major, v.minor, v.patch + 1);
-                return Ok(Ranges::from_range_bounds(next..));
-            }
-        }
-
-        // Handle <= (less than or equal)
-        if let Some(ver_str) = trimmed.strip_prefix("<=") {
-            if let Some(v) = SemVersion::parse(ver_str.trim()) {
-                let upper = SemVersion::new(v.major, v.minor, v.patch + 1);
-                return Ok(Ranges::from_range_bounds(..upper));
-            }
-        }
-
-        // Handle < (less than)
-        if let Some(ver_str) = trimmed.strip_prefix('<') {
-            if let Some(v) = SemVersion::parse(ver_str.trim()) {
-                return Ok(Ranges::from_range_bounds(..v));
-            }
-        }
-
-        // Handle plain version (treat as exact or caret depending on convention)
-        if let Some(v) = SemVersion::parse(trimmed) {
-            // Treat plain version as caret (npm-style)
-            let upper = if v.major > 0 {
-                SemVersion::new(v.major + 1, 0, 0)
-            } else if v.minor > 0 {
-                SemVersion::new(0, v.minor + 1, 0)
+    // Handle caret (^) - compatible with version
+    if let Some(ver_str) = trimmed.strip_prefix('^') {
+        if let Some(base) = SemVersion::parse(ver_str) {
+            // ^1.2.3 means >=1.2.3, <2.0.0 for major > 0
+            // ^0.2.3 means >=0.2.3, <0.3.0 for major = 0, minor > 0
+            // ^0.0.3 means >=0.0.3, <0.0.4 for major = 0, minor = 0
+            let upper = if base.major > 0 {
+                SemVersion::new(base.major + 1, 0, 0)
+            } else if base.minor > 0 {
+                SemVersion::new(0, base.minor + 1, 0)
             } else {
-                SemVersion::new(0, 0, v.patch + 1)
+                SemVersion::new(0, 0, base.patch + 1)
             };
-            return Ok(Ranges::from_range_bounds(v..upper));
+            return Ok(Ranges::from_range_bounds(base..upper));
         }
-
-        // Handle compound constraints like ">=1.0.0 <2.0.0"
-        if trimmed.contains(' ') {
-            let parts: Vec<&str> = trimmed.split_whitespace().collect();
-            if parts.len() == 2 {
-                let range1 = self.version_req_to_ranges(req, parts[0])?;
-                let range2 = self.version_req_to_ranges(req, parts[1])?;
-                return Ok(range1.intersection(&range2));
-            }
-        }
-
-        // Fallback: use semver to check if versions match
-        // This is less efficient but handles edge cases
-        Err(Error::Other(format!(
-            "Could not parse version constraint: {}",
-            original
-        )))
     }
 
+    // Handle tilde (~) - approximately equivalent
+    if let Some(ver_str) = trimmed.strip_prefix('~') {
+        if let Some(base) = SemVersion::parse(ver_str) {
+            // ~1.2.3 means >=1.2.3, <1.3.0
+            let upper = SemVersion::new(base.major, base.minor + 1, 0);
+            return Ok(Ranges::from_range_bounds(base..upper));
+        }
+    }
+
+    // Handle exact version (=)
+    if let Some(ver_str) = trimmed.strip_prefix('=') {
+        if let Some(v) = SemVersion::parse(ver_str.trim()) {
+            return Ok(Ranges::singleton(v));
+        }
+    }
+
+    // Handle >= (greater than or equal)
+    if let Some(ver_str) = trimmed.strip_prefix(">=") {
+        if let Some(v) = SemVersion::parse(ver_str.trim()) {
+            return Ok(Ranges::from_range_bounds(v..));
+        }
+    }
+
+    // Handle > (greater than)
+    if let Some(ver_str) = trimmed.strip_prefix('>') {
+        if let Some(v) = SemVersion::parse(ver_str.trim()) {
+            // Convert > to >= next patch
+            let next = SemVersion::new(v.major, v.minor, v.patch + 1);
+            return Ok(Ranges::from_range_bounds(next..));
+        }
+    }
+
+    // Handle <= (less than or equal)
+    if let Some(ver_str) = trimmed.strip_prefix("<=") {
+        if let Some(v) = SemVersion::parse(ver_str.trim()) {
+            let upper = SemVersion::new(v.major, v.minor, v.patch + 1);
+            return Ok(Ranges::from_range_bounds(..upper));
+        }
+    }
+
+    // Handle < (less than)
+    if let Some(ver_str) = trimmed.strip_prefix('<') {
+        if let Some(v) = SemVersion::parse(ver_str.trim()) {
+            return Ok(Ranges::from_range_bounds(..v));
+        }
+    }
+
+    // Handle plain version (treat as exact or caret depending on convention)
+    if let Some(v) = SemVersion::parse(trimmed) {
+        // Treat plain version as caret (npm-style)
+        let upper = if v.major > 0 {
+            SemVersion::new(v.major + 1, 0, 0)
+        } else if v.minor > 0 {
+            SemVersion::new(0, v.minor + 1, 0)
+        } else {
+            SemVersion::new(0, 0, v.patch + 1)
+        };
+        return Ok(Ranges::from_range_bounds(v..upper));
+    }
+
+    // Handle compound constraints like ">=1.0.0 <2.0.0"
+    if trimmed.contains(' ') {
+        let parts: Vec<&str> = trimmed.split_whitespace().collect();
+        if parts.len() == 2 {
+            let range1 = version_constraint_to_ranges(parts[0])?;
+            let range2 = version_constraint_to_ranges(parts[1])?;
+            return Ok(range1.intersection(&range2));
+        }
+    }
+
+    // Fallback: use semver to check if versions match
+    // This is less efficient but handles edge cases
+    Err(Error::Other(format!(
+        "Could not parse version constraint: {}",
+        original
+    )))
+}
+
+impl<'a> UnrealPmDependencyProvider<'a> {
     /// Get the PackageVersion for a resolved version
     pub fn get_package_version(&self, name: &str, version: &SemVersion) -> Option<PackageVersion> {
         if let Ok(versions) = self.get_available_versions(name) {

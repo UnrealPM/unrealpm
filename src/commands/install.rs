@@ -33,6 +33,7 @@ fn create_spinner_callback() -> ProgressCallback {
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn run(
     package: Option<String>,
     force: bool,
