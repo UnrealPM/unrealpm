@@ -56,7 +56,11 @@ pub mod signing;
 
 pub use config::{Config, ResolverConfig};
 pub use error::{Error, Result};
-pub use installer::{install_package, verify_checksum, ProgressCallback};
+pub use installer::{
+    get_package_store_path, get_store_dir, get_store_stats, install_package, install_package_cas,
+    is_package_in_store, link_or_copy_from_store, store_package, verify_checksum, ProgressCallback,
+    StoreStats,
+};
 pub use lockfile::{LockedPackage, Lockfile, LOCKFILE_NAME};
 pub use manifest::{Manifest, UPlugin, UPluginDependency, UProject};
 pub use platform::{

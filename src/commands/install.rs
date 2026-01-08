@@ -3,7 +3,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use std::env;
 use std::sync::Arc;
 use unrealpm::{
-    find_matching_version, install_package, resolve_dependencies, verify_checksum,
+    find_matching_version, install_package_cas, resolve_dependencies, verify_checksum,
     verify_signature, Config, Lockfile, Manifest, PrebuiltBinary, ProgressCallback, RegistryClient,
     ResolverConfig,
 };
@@ -249,8 +249,14 @@ fn install_single_package(
         // Verify checksum
         verify_checksum(&dep_tarball, &resolved_pkg.checksum, None)?;
 
-        // Install
-        install_package(&dep_tarball, &project_dir.to_path_buf(), dep_name, None)?;
+        // Install using CAS (Content-Addressable Storage)
+        install_package_cas(
+            &dep_tarball,
+            &project_dir.to_path_buf(),
+            dep_name,
+            &resolved_pkg.checksum,
+            None,
+        )?;
 
         // Update lockfile
         lockfile.update_package(
@@ -399,12 +405,13 @@ fn install_single_package(
     let progress = Some(create_spinner_callback());
     verify_checksum(&tarball_path, &checksum, progress)?;
 
-    // Install package with progress spinner
+    // Install package using CAS with progress spinner
     let progress = Some(create_spinner_callback());
-    let installed_path = install_package(
+    let installed_path = install_package_cas(
         &tarball_path,
         &project_dir.to_path_buf(),
         &package_name,
+        &checksum,
         progress,
     )?;
     println!("  ✓ Installed to {}", installed_path.display());
@@ -597,8 +604,14 @@ fn install_all_dependencies(
             }
         }
 
-        // Install package (no spinner for batch installs)
-        match install_package(&tarball_path, &project_dir.to_path_buf(), name, None) {
+        // Install package using CAS (no spinner for batch installs)
+        match install_package_cas(
+            &tarball_path,
+            &project_dir.to_path_buf(),
+            name,
+            &resolved_pkg.checksum,
+            None,
+        ) {
             Ok(_installed_path) => {
                 // Update lockfile
                 lockfile.update_package(

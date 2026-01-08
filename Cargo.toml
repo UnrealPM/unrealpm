@@ -40,6 +40,7 @@ webbrowser = "1.0"
 tiny_http = "0.12"
 url = "2.5"
 urlencoding = "2.1"
+dirs = "5.0"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"
