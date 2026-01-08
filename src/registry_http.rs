@@ -658,3 +658,286 @@ struct ApiDependency {
     name: String,
     version_constraint: String,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    // ============================================================================
+    // format_auth_header tests
+    // ============================================================================
+
+    #[test]
+    fn test_format_auth_header_api_token() {
+        // API tokens starting with "urpm_" should use "Token" format
+        let token = "urpm_abc123xyz";
+        let header = HttpRegistryClient::format_auth_header(token);
+        assert_eq!(header, "Token urpm_abc123xyz");
+    }
+
+    #[test]
+    fn test_format_auth_header_jwt() {
+        // JWT tokens (not starting with "urpm_") should use "Bearer" format
+        let token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abc";
+        let header = HttpRegistryClient::format_auth_header(token);
+        assert!(header.starts_with("Bearer "));
+        assert!(header.contains("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"));
+    }
+
+    #[test]
+    fn test_format_auth_header_short_token() {
+        // Short tokens without "urpm_" prefix should use Bearer
+        let token = "short_token";
+        let header = HttpRegistryClient::format_auth_header(token);
+        assert_eq!(header, "Bearer short_token");
+    }
+
+    #[test]
+    fn test_format_auth_header_empty() {
+        // Empty token should use Bearer format
+        let token = "";
+        let header = HttpRegistryClient::format_auth_header(token);
+        assert_eq!(header, "Bearer ");
+    }
+
+    // ============================================================================
+    // HttpRegistryClient::new tests
+    // ============================================================================
+
+    #[test]
+    fn test_client_new_creates_directories() {
+        let temp_dir = TempDir::new().unwrap();
+        let cache_dir = temp_dir.path().join("cache");
+
+        let client =
+            HttpRegistryClient::new("http://localhost:3000".to_string(), cache_dir.clone(), None);
+
+        assert!(client.is_ok());
+        assert!(cache_dir.exists());
+        assert!(cache_dir.join("tarballs").exists());
+        assert!(cache_dir.join("signatures").exists());
+    }
+
+    #[test]
+    fn test_client_new_with_token() {
+        let temp_dir = TempDir::new().unwrap();
+        let cache_dir = temp_dir.path().join("cache");
+
+        let client = HttpRegistryClient::new(
+            "http://localhost:3000".to_string(),
+            cache_dir,
+            Some("urpm_test_token".to_string()),
+        );
+
+        assert!(client.is_ok());
+    }
+
+    #[test]
+    fn test_client_new_existing_cache() {
+        let temp_dir = TempDir::new().unwrap();
+        let cache_dir = temp_dir.path().join("cache");
+
+        // Pre-create directories
+        std::fs::create_dir_all(&cache_dir).unwrap();
+        std::fs::create_dir_all(cache_dir.join("tarballs")).unwrap();
+
+        let client =
+            HttpRegistryClient::new("http://localhost:3000".to_string(), cache_dir.clone(), None);
+
+        assert!(client.is_ok());
+        // Should also create signatures dir
+        assert!(cache_dir.join("signatures").exists());
+    }
+
+    // ============================================================================
+    // Path generation tests
+    // ============================================================================
+
+    #[test]
+    fn test_get_tarball_path() {
+        let temp_dir = TempDir::new().unwrap();
+        let cache_dir = temp_dir.path().join("cache");
+
+        let client =
+            HttpRegistryClient::new("http://localhost:3000".to_string(), cache_dir.clone(), None)
+                .unwrap();
+
+        let path = client.get_tarball_path("my-plugin", "1.2.3");
+        assert_eq!(
+            path,
+            cache_dir.join("tarballs").join("my-plugin-1.2.3.tar.gz")
+        );
+    }
+
+    #[test]
+    fn test_get_signature_path() {
+        let temp_dir = TempDir::new().unwrap();
+        let cache_dir = temp_dir.path().join("cache");
+
+        let client =
+            HttpRegistryClient::new("http://localhost:3000".to_string(), cache_dir.clone(), None)
+                .unwrap();
+
+        let path = client.get_signature_path("my-plugin", "1.2.3");
+        assert_eq!(
+            path,
+            cache_dir.join("signatures").join("my-plugin-1.2.3.sig")
+        );
+    }
+
+    #[test]
+    fn test_get_tarballs_dir() {
+        let temp_dir = TempDir::new().unwrap();
+        let cache_dir = temp_dir.path().join("cache");
+
+        let client =
+            HttpRegistryClient::new("http://localhost:3000".to_string(), cache_dir.clone(), None)
+                .unwrap();
+
+        assert_eq!(client.get_tarballs_dir(), cache_dir.join("tarballs"));
+    }
+
+    #[test]
+    fn test_get_signatures_dir() {
+        let temp_dir = TempDir::new().unwrap();
+        let cache_dir = temp_dir.path().join("cache");
+
+        let client =
+            HttpRegistryClient::new("http://localhost:3000".to_string(), cache_dir.clone(), None)
+                .unwrap();
+
+        assert_eq!(client.get_signatures_dir(), cache_dir.join("signatures"));
+    }
+
+    #[test]
+    fn test_get_packages_dir() {
+        let temp_dir = TempDir::new().unwrap();
+        let cache_dir = temp_dir.path().join("cache");
+
+        let client =
+            HttpRegistryClient::new("http://localhost:3000".to_string(), cache_dir.clone(), None)
+                .unwrap();
+
+        assert_eq!(client.get_packages_dir(), cache_dir.join("packages"));
+    }
+
+    // ============================================================================
+    // calculate_checksum tests
+    // ============================================================================
+
+    #[test]
+    fn test_calculate_checksum() {
+        let temp_dir = TempDir::new().unwrap();
+        let test_file = temp_dir.path().join("test.txt");
+
+        std::fs::write(&test_file, "Hello, World!").unwrap();
+
+        let checksum = calculate_checksum(&test_file);
+        assert!(checksum.is_ok());
+
+        // SHA256 of "Hello, World!" is known
+        let expected = "dffd6021bb2bd5b0af676290809ec3a53191dd81c7f70a4b28688a362182986f";
+        assert_eq!(checksum.unwrap(), expected);
+    }
+
+    #[test]
+    fn test_calculate_checksum_empty_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let test_file = temp_dir.path().join("empty.txt");
+
+        std::fs::write(&test_file, "").unwrap();
+
+        let checksum = calculate_checksum(&test_file);
+        assert!(checksum.is_ok());
+
+        // SHA256 of empty string
+        let expected = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+        assert_eq!(checksum.unwrap(), expected);
+    }
+
+    #[test]
+    fn test_calculate_checksum_file_not_found() {
+        let result = calculate_checksum(Path::new("/nonexistent/file.txt"));
+        assert!(result.is_err());
+    }
+
+    // ============================================================================
+    // parse_package_type tests
+    // ============================================================================
+
+    #[test]
+    fn test_parse_package_type_source() {
+        assert_eq!(parse_package_type("source"), crate::PackageType::Source);
+    }
+
+    #[test]
+    fn test_parse_package_type_binary() {
+        assert_eq!(parse_package_type("binary"), crate::PackageType::Binary);
+    }
+
+    #[test]
+    fn test_parse_package_type_hybrid() {
+        assert_eq!(parse_package_type("hybrid"), crate::PackageType::Hybrid);
+    }
+
+    #[test]
+    fn test_parse_package_type_unknown() {
+        // Unknown types default to Source
+        assert_eq!(parse_package_type("unknown"), crate::PackageType::Source);
+        assert_eq!(parse_package_type(""), crate::PackageType::Source);
+    }
+
+    // ============================================================================
+    // PublishMetadata tests
+    // ============================================================================
+
+    #[test]
+    fn test_publish_metadata_serialization() {
+        let metadata = PublishMetadata {
+            name: "test-plugin".to_string(),
+            version: "1.0.0".to_string(),
+            description: Some("A test plugin".to_string()),
+            checksum: "abc123".to_string(),
+            package_type: "source".to_string(),
+            engine_versions: Some(vec!["5.3".to_string(), "5.4".to_string()]),
+            dependencies: Some(vec![DependencySpec {
+                name: "dep".to_string(),
+                version: "^1.0.0".to_string(),
+            }]),
+            public_key: None,
+            signed_at: None,
+            engine_major: Some(5),
+            engine_minor: Some(3),
+            engine_patch: None,
+            is_multi_engine: Some(true),
+            git_repository: None,
+            git_tag: None,
+            readme: None,
+            readme_type: None,
+        };
+
+        let json = serde_json::to_string(&metadata);
+        assert!(json.is_ok());
+
+        let json_str = json.unwrap();
+        assert!(json_str.contains("test-plugin"));
+        assert!(json_str.contains("1.0.0"));
+        assert!(json_str.contains("5.3"));
+    }
+
+    #[test]
+    fn test_dependency_spec_serialization() {
+        let dep = DependencySpec {
+            name: "my-dep".to_string(),
+            version: "^2.0.0".to_string(),
+        };
+
+        let json = serde_json::to_string(&dep);
+        assert!(json.is_ok());
+
+        let json_str = json.unwrap();
+        assert!(json_str.contains("my-dep"));
+        assert!(json_str.contains("^2.0.0"));
+    }
+}

@@ -804,11 +804,27 @@ pub fn find_matching_version(
 mod tests {
     use super::*;
 
+    // ============================================================================
+    // SemVersion tests
+    // ============================================================================
+
     #[test]
     fn test_sem_version_parse() {
         assert_eq!(SemVersion::parse("1.2.3"), Some(SemVersion::new(1, 2, 3)));
         assert_eq!(SemVersion::parse("1.2"), Some(SemVersion::new(1, 2, 0)));
         assert_eq!(SemVersion::parse("invalid"), None);
+    }
+
+    #[test]
+    fn test_sem_version_parse_single_digit() {
+        // Single digit should fail
+        assert_eq!(SemVersion::parse("1"), None);
+    }
+
+    #[test]
+    fn test_sem_version_parse_four_parts() {
+        // Four parts should fail
+        assert_eq!(SemVersion::parse("1.2.3.4"), None);
     }
 
     #[test]
@@ -829,9 +845,160 @@ mod tests {
     }
 
     #[test]
+    fn test_sem_version_equality() {
+        let v1 = SemVersion::new(1, 2, 3);
+        let v2 = SemVersion::new(1, 2, 3);
+        let v3 = SemVersion::new(1, 2, 4);
+
+        assert_eq!(v1, v2);
+        assert_ne!(v1, v3);
+    }
+
+    #[test]
+    fn test_sem_version_from_semver() {
+        let semver_v = semver::Version::new(1, 2, 3);
+        let sem_v: SemVersion = semver_v.into();
+        assert_eq!(sem_v, SemVersion::new(1, 2, 3));
+    }
+
+    #[test]
+    fn test_sem_version_to_semver() {
+        let sem_v = SemVersion::new(1, 2, 3);
+        let semver_v = sem_v.to_semver();
+        assert_eq!(semver_v.major, 1);
+        assert_eq!(semver_v.minor, 2);
+        assert_eq!(semver_v.patch, 3);
+    }
+
+    // ============================================================================
+    // version_constraint_to_ranges tests
+    // ============================================================================
+
+    #[test]
+    fn test_constraint_wildcard() {
+        let range = version_constraint_to_ranges("*").unwrap();
+        // Wildcard should match everything
+        assert!(range.contains(&SemVersion::new(0, 0, 1)));
+        assert!(range.contains(&SemVersion::new(1, 0, 0)));
+        assert!(range.contains(&SemVersion::new(999, 999, 999)));
+    }
+
+    #[test]
+    fn test_constraint_caret_major() {
+        let range = version_constraint_to_ranges("^1.2.3").unwrap();
+        // ^1.2.3 means >=1.2.3, <2.0.0
+        assert!(!range.contains(&SemVersion::new(1, 2, 2)));
+        assert!(range.contains(&SemVersion::new(1, 2, 3)));
+        assert!(range.contains(&SemVersion::new(1, 9, 9)));
+        assert!(!range.contains(&SemVersion::new(2, 0, 0)));
+    }
+
+    #[test]
+    fn test_constraint_caret_zero_major() {
+        let range = version_constraint_to_ranges("^0.2.3").unwrap();
+        // ^0.2.3 means >=0.2.3, <0.3.0 (when major = 0)
+        assert!(!range.contains(&SemVersion::new(0, 2, 2)));
+        assert!(range.contains(&SemVersion::new(0, 2, 3)));
+        assert!(range.contains(&SemVersion::new(0, 2, 9)));
+        assert!(!range.contains(&SemVersion::new(0, 3, 0)));
+    }
+
+    #[test]
+    fn test_constraint_caret_zero_minor() {
+        let range = version_constraint_to_ranges("^0.0.3").unwrap();
+        // ^0.0.3 means >=0.0.3, <0.0.4 (when major = 0, minor = 0)
+        assert!(!range.contains(&SemVersion::new(0, 0, 2)));
+        assert!(range.contains(&SemVersion::new(0, 0, 3)));
+        assert!(!range.contains(&SemVersion::new(0, 0, 4)));
+    }
+
+    #[test]
+    fn test_constraint_tilde() {
+        let range = version_constraint_to_ranges("~1.2.3").unwrap();
+        // ~1.2.3 means >=1.2.3, <1.3.0
+        assert!(!range.contains(&SemVersion::new(1, 2, 2)));
+        assert!(range.contains(&SemVersion::new(1, 2, 3)));
+        assert!(range.contains(&SemVersion::new(1, 2, 9)));
+        assert!(!range.contains(&SemVersion::new(1, 3, 0)));
+    }
+
+    #[test]
+    fn test_constraint_exact() {
+        let range = version_constraint_to_ranges("=1.2.3").unwrap();
+        // =1.2.3 means exactly 1.2.3
+        assert!(!range.contains(&SemVersion::new(1, 2, 2)));
+        assert!(range.contains(&SemVersion::new(1, 2, 3)));
+        assert!(!range.contains(&SemVersion::new(1, 2, 4)));
+    }
+
+    #[test]
+    fn test_constraint_gte() {
+        let range = version_constraint_to_ranges(">=1.2.0").unwrap();
+        // >=1.2.0 means >= 1.2.0
+        assert!(!range.contains(&SemVersion::new(1, 1, 9)));
+        assert!(range.contains(&SemVersion::new(1, 2, 0)));
+        assert!(range.contains(&SemVersion::new(2, 0, 0)));
+        assert!(range.contains(&SemVersion::new(999, 0, 0)));
+    }
+
+    #[test]
+    fn test_constraint_gt() {
+        let range = version_constraint_to_ranges(">1.2.0").unwrap();
+        // >1.2.0 means > 1.2.0 (>=1.2.1)
+        assert!(!range.contains(&SemVersion::new(1, 2, 0)));
+        assert!(range.contains(&SemVersion::new(1, 2, 1)));
+        assert!(range.contains(&SemVersion::new(2, 0, 0)));
+    }
+
+    #[test]
+    fn test_constraint_lte() {
+        let range = version_constraint_to_ranges("<=1.2.0").unwrap();
+        // <=1.2.0 means <= 1.2.0
+        assert!(range.contains(&SemVersion::new(0, 0, 1)));
+        assert!(range.contains(&SemVersion::new(1, 2, 0)));
+        assert!(!range.contains(&SemVersion::new(1, 2, 1)));
+    }
+
+    #[test]
+    fn test_constraint_lt() {
+        let range = version_constraint_to_ranges("<1.2.0").unwrap();
+        // <1.2.0 means < 1.2.0
+        assert!(range.contains(&SemVersion::new(0, 0, 1)));
+        assert!(range.contains(&SemVersion::new(1, 1, 9)));
+        assert!(!range.contains(&SemVersion::new(1, 2, 0)));
+    }
+
+    #[test]
+    fn test_constraint_plain_version() {
+        let range = version_constraint_to_ranges("1.2.3").unwrap();
+        // Plain version treated as caret (^1.2.3)
+        assert!(range.contains(&SemVersion::new(1, 2, 3)));
+        assert!(range.contains(&SemVersion::new(1, 9, 9)));
+        assert!(!range.contains(&SemVersion::new(2, 0, 0)));
+    }
+
+    #[test]
+    fn test_constraint_compound() {
+        let range = version_constraint_to_ranges(">=1.0.0 <2.0.0").unwrap();
+        // >=1.0.0 <2.0.0 (AND of both)
+        assert!(!range.contains(&SemVersion::new(0, 9, 9)));
+        assert!(range.contains(&SemVersion::new(1, 0, 0)));
+        assert!(range.contains(&SemVersion::new(1, 9, 9)));
+        assert!(!range.contains(&SemVersion::new(2, 0, 0)));
+    }
+
+    #[test]
+    fn test_constraint_invalid() {
+        let result = version_constraint_to_ranges("not-a-version");
+        assert!(result.is_err());
+    }
+
+    // ============================================================================
+    // Range behavior tests
+    // ============================================================================
+
+    #[test]
     fn test_caret_constraint_major() {
-        // Create a test provider to access parse_version_constraint
-        // For now, test the range directly
         let v1 = SemVersion::new(1, 0, 0);
         let v2 = SemVersion::new(1, 9, 9);
         let v3 = SemVersion::new(2, 0, 0);
@@ -856,5 +1023,40 @@ mod tests {
         assert!(range.contains(&v1));
         assert!(range.contains(&v2));
         assert!(!range.contains(&v3));
+    }
+
+    #[test]
+    fn test_range_singleton() {
+        let v = SemVersion::new(1, 2, 3);
+        let range: VersionRange = Ranges::singleton(v.clone());
+
+        assert!(range.contains(&v));
+        assert!(!range.contains(&SemVersion::new(1, 2, 2)));
+        assert!(!range.contains(&SemVersion::new(1, 2, 4)));
+    }
+
+    #[test]
+    fn test_range_intersection() {
+        let range1: VersionRange =
+            Ranges::from_range_bounds(SemVersion::new(1, 0, 0)..SemVersion::new(3, 0, 0));
+        let range2: VersionRange =
+            Ranges::from_range_bounds(SemVersion::new(2, 0, 0)..SemVersion::new(4, 0, 0));
+
+        let intersection = range1.intersection(&range2);
+
+        // Intersection should be [2.0.0, 3.0.0)
+        assert!(!intersection.contains(&SemVersion::new(1, 9, 9)));
+        assert!(intersection.contains(&SemVersion::new(2, 0, 0)));
+        assert!(intersection.contains(&SemVersion::new(2, 9, 9)));
+        assert!(!intersection.contains(&SemVersion::new(3, 0, 0)));
+    }
+
+    #[test]
+    fn test_range_full() {
+        let range: VersionRange = Ranges::full();
+
+        assert!(range.contains(&SemVersion::new(0, 0, 0)));
+        assert!(range.contains(&SemVersion::new(0, 0, 1)));
+        assert!(range.contains(&SemVersion::new(999, 999, 999)));
     }
 }

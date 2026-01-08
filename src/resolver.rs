@@ -281,3 +281,508 @@ impl Default for Resolver {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::registry::PackageType;
+
+    /// Helper to create a test package version
+    fn make_version(
+        version: &str,
+        engine_major: Option<i32>,
+        engine_minor: Option<i32>,
+        is_multi_engine: bool,
+        engine_versions: Option<Vec<&str>>,
+    ) -> PackageVersion {
+        PackageVersion {
+            version: version.to_string(),
+            tarball: format!("{}.tar.gz", version),
+            checksum: "abc123".to_string(),
+            dependencies: None,
+            engine_versions: engine_versions.map(|v| v.iter().map(|s| s.to_string()).collect()),
+            engine_major,
+            engine_minor,
+            is_multi_engine,
+            package_type: PackageType::Source,
+            binaries: None,
+            public_key: None,
+            signed_at: None,
+        }
+    }
+
+    /// Helper to create test package metadata
+    fn make_metadata(name: &str, versions: Vec<PackageVersion>) -> PackageMetadata {
+        PackageMetadata {
+            name: name.to_string(),
+            description: Some("Test package".to_string()),
+            versions,
+        }
+    }
+
+    // ============================================================================
+    // find_matching_version tests
+    // ============================================================================
+
+    #[test]
+    fn test_find_matching_version_exact() {
+        let metadata = make_metadata(
+            "test-pkg",
+            vec![
+                make_version("1.0.0", None, None, true, Some(vec!["5.3", "5.4"])),
+                make_version("1.1.0", None, None, true, Some(vec!["5.3", "5.4"])),
+                make_version("2.0.0", None, None, true, Some(vec!["5.3", "5.4"])),
+            ],
+        );
+
+        let result = find_matching_version(&metadata, "=1.1.0", None, false);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().version, "1.1.0");
+    }
+
+    #[test]
+    fn test_find_matching_version_caret() {
+        let metadata = make_metadata(
+            "test-pkg",
+            vec![
+                make_version("1.0.0", None, None, true, Some(vec!["5.3"])),
+                make_version("1.5.0", None, None, true, Some(vec!["5.3"])),
+                make_version("1.9.0", None, None, true, Some(vec!["5.3"])),
+                make_version("2.0.0", None, None, true, Some(vec!["5.3"])),
+            ],
+        );
+
+        // ^1.0.0 should match >= 1.0.0, < 2.0.0 (highest is 1.9.0)
+        let result = find_matching_version(&metadata, "^1.0.0", None, false);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().version, "1.9.0");
+    }
+
+    #[test]
+    fn test_find_matching_version_tilde() {
+        let metadata = make_metadata(
+            "test-pkg",
+            vec![
+                make_version("1.2.0", None, None, true, Some(vec!["5.3"])),
+                make_version("1.2.5", None, None, true, Some(vec!["5.3"])),
+                make_version("1.3.0", None, None, true, Some(vec!["5.3"])),
+            ],
+        );
+
+        // ~1.2.0 should match >= 1.2.0, < 1.3.0 (highest is 1.2.5)
+        let result = find_matching_version(&metadata, "~1.2.0", None, false);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().version, "1.2.5");
+    }
+
+    #[test]
+    fn test_find_matching_version_wildcard() {
+        let metadata = make_metadata(
+            "test-pkg",
+            vec![
+                make_version("1.0.0", None, None, true, Some(vec!["5.3"])),
+                make_version("5.0.0", None, None, true, Some(vec!["5.3"])),
+            ],
+        );
+
+        // * should match any version (highest is 5.0.0)
+        let result = find_matching_version(&metadata, "*", None, false);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().version, "5.0.0");
+    }
+
+    #[test]
+    fn test_find_matching_version_engine_specific() {
+        let metadata = make_metadata(
+            "test-pkg",
+            vec![
+                make_version("1.0.0", Some(5), Some(3), false, None),
+                make_version("1.0.0", Some(5), Some(4), false, None),
+            ],
+        );
+
+        // Should only match 5.3 version
+        let result = find_matching_version(&metadata, "^1.0.0", Some("5.3"), false);
+        assert!(result.is_ok());
+        let version = result.unwrap();
+        assert_eq!(version.engine_major, Some(5));
+        assert_eq!(version.engine_minor, Some(3));
+    }
+
+    #[test]
+    fn test_find_matching_version_multi_engine() {
+        let metadata = make_metadata(
+            "test-pkg",
+            vec![make_version(
+                "1.0.0",
+                None,
+                None,
+                true,
+                Some(vec!["5.3", "5.4", "5.5"]),
+            )],
+        );
+
+        // Should match for engine 5.4
+        let result = find_matching_version(&metadata, "^1.0.0", Some("5.4"), false);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().version, "1.0.0");
+
+        // Should NOT match for engine 5.2 (not in list)
+        let result = find_matching_version(&metadata, "^1.0.0", Some("5.2"), false);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_find_matching_version_prefers_engine_specific() {
+        let metadata = make_metadata(
+            "test-pkg",
+            vec![
+                // Multi-engine version
+                make_version("1.0.0", None, None, true, Some(vec!["5.3", "5.4"])),
+                // Engine-specific version (should be preferred)
+                make_version("1.0.0", Some(5), Some(3), false, None),
+            ],
+        );
+
+        let result = find_matching_version(&metadata, "^1.0.0", Some("5.3"), false);
+        assert!(result.is_ok());
+        let version = result.unwrap();
+        // Should prefer engine-specific over multi-engine
+        assert!(!version.is_multi_engine);
+    }
+
+    #[test]
+    fn test_find_matching_version_force_ignores_engine() {
+        let metadata = make_metadata(
+            "test-pkg",
+            vec![make_version("1.0.0", Some(5), Some(3), false, None)],
+        );
+
+        // Without force: should fail for 5.4
+        let result = find_matching_version(&metadata, "^1.0.0", Some("5.4"), false);
+        assert!(result.is_err());
+
+        // With force: should succeed
+        let result = find_matching_version(&metadata, "^1.0.0", Some("5.4"), true);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_find_matching_version_no_match() {
+        let metadata = make_metadata(
+            "test-pkg",
+            vec![
+                make_version("1.0.0", None, None, true, Some(vec!["5.3"])),
+                make_version("1.1.0", None, None, true, Some(vec!["5.3"])),
+            ],
+        );
+
+        // No version >= 2.0.0 exists
+        let result = find_matching_version(&metadata, ">=2.0.0", None, false);
+        assert!(result.is_err());
+
+        let err = result.unwrap_err();
+        let err_msg = err.to_string();
+        assert!(err_msg.contains("No version"));
+        assert!(err_msg.contains("test-pkg"));
+    }
+
+    #[test]
+    fn test_find_matching_version_invalid_constraint() {
+        let metadata = make_metadata(
+            "test-pkg",
+            vec![make_version("1.0.0", None, None, true, Some(vec!["5.3"]))],
+        );
+
+        let result = find_matching_version(&metadata, "invalid-constraint", None, false);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Invalid version"));
+    }
+
+    #[test]
+    fn test_find_matching_version_highest_selected() {
+        let metadata = make_metadata(
+            "test-pkg",
+            vec![
+                make_version("1.0.0", None, None, true, Some(vec!["5.3"])),
+                make_version("1.1.0", None, None, true, Some(vec!["5.3"])),
+                make_version("1.2.0", None, None, true, Some(vec!["5.3"])),
+            ],
+        );
+
+        // Should pick highest matching version
+        let result = find_matching_version(&metadata, "^1.0.0", None, false);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().version, "1.2.0");
+    }
+
+    // ============================================================================
+    // detect_circular_deps tests
+    // ============================================================================
+
+    #[test]
+    fn test_detect_circular_deps_no_cycle() {
+        // A -> B -> C (no cycle)
+        let mut deps = HashMap::new();
+
+        deps.insert(
+            "A".to_string(),
+            ResolvedPackage {
+                name: "A".to_string(),
+                version: "1.0.0".to_string(),
+                checksum: "abc".to_string(),
+                dependencies: Some({
+                    let mut d = HashMap::new();
+                    d.insert("B".to_string(), "^1.0.0".to_string());
+                    d
+                }),
+            },
+        );
+        deps.insert(
+            "B".to_string(),
+            ResolvedPackage {
+                name: "B".to_string(),
+                version: "1.0.0".to_string(),
+                checksum: "def".to_string(),
+                dependencies: Some({
+                    let mut d = HashMap::new();
+                    d.insert("C".to_string(), "^1.0.0".to_string());
+                    d
+                }),
+            },
+        );
+        deps.insert(
+            "C".to_string(),
+            ResolvedPackage {
+                name: "C".to_string(),
+                version: "1.0.0".to_string(),
+                checksum: "ghi".to_string(),
+                dependencies: None,
+            },
+        );
+
+        let mut visited = HashSet::new();
+        let mut path = Vec::new();
+
+        let result = detect_circular_deps("A", &deps, &mut visited, &mut path);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_detect_circular_deps_direct_cycle() {
+        // A -> B -> A (direct cycle)
+        let mut deps = HashMap::new();
+
+        deps.insert(
+            "A".to_string(),
+            ResolvedPackage {
+                name: "A".to_string(),
+                version: "1.0.0".to_string(),
+                checksum: "abc".to_string(),
+                dependencies: Some({
+                    let mut d = HashMap::new();
+                    d.insert("B".to_string(), "^1.0.0".to_string());
+                    d
+                }),
+            },
+        );
+        deps.insert(
+            "B".to_string(),
+            ResolvedPackage {
+                name: "B".to_string(),
+                version: "1.0.0".to_string(),
+                checksum: "def".to_string(),
+                dependencies: Some({
+                    let mut d = HashMap::new();
+                    d.insert("A".to_string(), "^1.0.0".to_string());
+                    d
+                }),
+            },
+        );
+
+        let mut visited = HashSet::new();
+        let mut path = Vec::new();
+
+        let result = detect_circular_deps("A", &deps, &mut visited, &mut path);
+        assert!(result.is_err());
+
+        let err = result.unwrap_err();
+        let err_msg = err.to_string();
+        assert!(err_msg.contains("Circular dependency"));
+        assert!(err_msg.contains("A") && err_msg.contains("B"));
+    }
+
+    #[test]
+    fn test_detect_circular_deps_indirect_cycle() {
+        // A -> B -> C -> A (indirect cycle)
+        let mut deps = HashMap::new();
+
+        deps.insert(
+            "A".to_string(),
+            ResolvedPackage {
+                name: "A".to_string(),
+                version: "1.0.0".to_string(),
+                checksum: "abc".to_string(),
+                dependencies: Some({
+                    let mut d = HashMap::new();
+                    d.insert("B".to_string(), "^1.0.0".to_string());
+                    d
+                }),
+            },
+        );
+        deps.insert(
+            "B".to_string(),
+            ResolvedPackage {
+                name: "B".to_string(),
+                version: "1.0.0".to_string(),
+                checksum: "def".to_string(),
+                dependencies: Some({
+                    let mut d = HashMap::new();
+                    d.insert("C".to_string(), "^1.0.0".to_string());
+                    d
+                }),
+            },
+        );
+        deps.insert(
+            "C".to_string(),
+            ResolvedPackage {
+                name: "C".to_string(),
+                version: "1.0.0".to_string(),
+                checksum: "ghi".to_string(),
+                dependencies: Some({
+                    let mut d = HashMap::new();
+                    d.insert("A".to_string(), "^1.0.0".to_string());
+                    d
+                }),
+            },
+        );
+
+        let mut visited = HashSet::new();
+        let mut path = Vec::new();
+
+        let result = detect_circular_deps("A", &deps, &mut visited, &mut path);
+        assert!(result.is_err());
+
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("Circular dependency"));
+    }
+
+    #[test]
+    fn test_detect_circular_deps_diamond_no_cycle() {
+        // Diamond: A -> B, A -> C, B -> D, C -> D (no cycle)
+        let mut deps = HashMap::new();
+
+        deps.insert(
+            "A".to_string(),
+            ResolvedPackage {
+                name: "A".to_string(),
+                version: "1.0.0".to_string(),
+                checksum: "abc".to_string(),
+                dependencies: Some({
+                    let mut d = HashMap::new();
+                    d.insert("B".to_string(), "^1.0.0".to_string());
+                    d.insert("C".to_string(), "^1.0.0".to_string());
+                    d
+                }),
+            },
+        );
+        deps.insert(
+            "B".to_string(),
+            ResolvedPackage {
+                name: "B".to_string(),
+                version: "1.0.0".to_string(),
+                checksum: "def".to_string(),
+                dependencies: Some({
+                    let mut d = HashMap::new();
+                    d.insert("D".to_string(), "^1.0.0".to_string());
+                    d
+                }),
+            },
+        );
+        deps.insert(
+            "C".to_string(),
+            ResolvedPackage {
+                name: "C".to_string(),
+                version: "1.0.0".to_string(),
+                checksum: "ghi".to_string(),
+                dependencies: Some({
+                    let mut d = HashMap::new();
+                    d.insert("D".to_string(), "^1.0.0".to_string());
+                    d
+                }),
+            },
+        );
+        deps.insert(
+            "D".to_string(),
+            ResolvedPackage {
+                name: "D".to_string(),
+                version: "1.0.0".to_string(),
+                checksum: "jkl".to_string(),
+                dependencies: None,
+            },
+        );
+
+        let mut visited = HashSet::new();
+        let mut path = Vec::new();
+
+        let result = detect_circular_deps("A", &deps, &mut visited, &mut path);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_detect_circular_deps_empty_deps() {
+        let deps = HashMap::new();
+        let mut visited = HashSet::new();
+        let mut path = Vec::new();
+
+        // Package not in deps - should succeed (no dependencies to check)
+        let result = detect_circular_deps("A", &deps, &mut visited, &mut path);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_detect_circular_deps_self_dependency() {
+        // A -> A (self-dependency)
+        let mut deps = HashMap::new();
+
+        deps.insert(
+            "A".to_string(),
+            ResolvedPackage {
+                name: "A".to_string(),
+                version: "1.0.0".to_string(),
+                checksum: "abc".to_string(),
+                dependencies: Some({
+                    let mut d = HashMap::new();
+                    d.insert("A".to_string(), "^1.0.0".to_string());
+                    d
+                }),
+            },
+        );
+
+        let mut visited = HashSet::new();
+        let mut path = Vec::new();
+
+        let result = detect_circular_deps("A", &deps, &mut visited, &mut path);
+        assert!(result.is_err());
+
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("Circular dependency"));
+        assert!(err_msg.contains("A → A"));
+    }
+
+    // ============================================================================
+    // Resolver struct tests
+    // ============================================================================
+
+    #[test]
+    fn test_resolver_new() {
+        let resolver = Resolver::new();
+        // Just verify it creates without panic
+        let _ = resolver;
+    }
+
+    #[test]
+    fn test_resolver_default() {
+        let _resolver: Resolver = Default::default();
+    }
+}
