@@ -152,6 +152,12 @@ enum Commands {
         all_platforms: bool,
     },
 
+    /// Manage the package cache
+    Cache {
+        #[command(subcommand)]
+        action: CacheAction,
+    },
+
     /// Manage configuration
     Config {
         #[command(subcommand)]
@@ -292,6 +298,36 @@ enum KeysAction {
     Show,
 }
 
+#[derive(Subcommand)]
+enum CacheAction {
+    /// List cached packages
+    List {
+        /// Show verbose output with full hashes and paths
+        #[arg(short, long)]
+        verbose: bool,
+    },
+
+    /// Show cache statistics
+    Info,
+
+    /// Show cache directory path
+    Path,
+
+    /// Remove unused packages from cache
+    Clean {
+        /// Remove ALL packages (not just unused)
+        #[arg(long)]
+        all: bool,
+
+        /// Show what would be removed without actually removing
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// Verify cache integrity
+    Verify,
+}
+
 fn main() {
     let cli = Cli::parse();
 
@@ -353,6 +389,13 @@ fn main() {
             platform,
             all_platforms,
         } => commands::build::run(path, engine, platform, all_platforms),
+        Commands::Cache { action } => match action {
+            CacheAction::List { verbose } => commands::cache::run_list(verbose),
+            CacheAction::Info => commands::cache::run_info(),
+            CacheAction::Path => commands::cache::run_path(),
+            CacheAction::Clean { all, dry_run } => commands::cache::run_clean(all, dry_run),
+            CacheAction::Verify => commands::cache::run_verify(),
+        },
         Commands::Config { action } => commands::config::run(&action),
         Commands::Keys { action } => commands::keys::run(&action),
         Commands::Verify { package } => commands::verify::run(package),
