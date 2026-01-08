@@ -1,12 +1,14 @@
 pub mod build;
 pub mod cache;
 pub mod config;
+pub mod doctor;
 pub mod init;
 pub mod install;
 pub mod keys;
 pub mod list;
 pub mod login;
 pub mod outdated;
+pub mod pack;
 pub mod publish;
 pub mod register;
 pub mod search;

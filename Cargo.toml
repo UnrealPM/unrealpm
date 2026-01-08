@@ -1,6 +1,6 @@
 [package]
 name = "unrealpm"
-version = "0.4.6"
+version = "0.4.7"
 edition = "2021"
 authors = ["UnrealPM Contributors"]
 description = "A modern package manager for Unreal Engine plugins"

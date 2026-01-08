@@ -46,6 +46,10 @@ enum Commands {
         #[arg(long)]
         dry_run: bool,
 
+        /// Offline mode - install from lockfile and cache only, no network requests
+        #[arg(long)]
+        offline: bool,
+
         /// Show verbose conflict information during dependency resolution
         #[arg(long)]
         verbose_resolve: bool,
@@ -92,6 +96,24 @@ enum Commands {
 
     /// Check for outdated packages
     Outdated,
+
+    /// Create a package tarball without publishing
+    Pack {
+        /// Path to plugin directory (defaults to current directory)
+        path: Option<String>,
+
+        /// Output path for tarball (defaults to current directory)
+        #[arg(short, long)]
+        output: Option<String>,
+
+        /// Include Binaries/ folder in package
+        #[arg(long)]
+        include_binaries: bool,
+
+        /// Show what would be packed without creating the tarball
+        #[arg(long)]
+        dry_run: bool,
+    },
 
     /// Show dependency tree
     Tree,
@@ -162,6 +184,17 @@ enum Commands {
     Config {
         #[command(subcommand)]
         action: ConfigAction,
+    },
+
+    /// Diagnose setup issues
+    Doctor {
+        /// Show detailed output
+        #[arg(short, long)]
+        verbose: bool,
+
+        /// Automatically fix issues where possible
+        #[arg(long)]
+        fix: bool,
     },
 
     /// Manage signing keys
@@ -341,6 +374,7 @@ fn main() {
             source_only,
             binary_only,
             dry_run,
+            offline,
             verbose_resolve,
             max_depth,
             resolve_timeout,
@@ -352,6 +386,7 @@ fn main() {
             source_only,
             binary_only,
             dry_run,
+            offline,
             verbose_resolve,
             max_depth,
             resolve_timeout,
@@ -372,6 +407,12 @@ fn main() {
         ),
         Commands::List => commands::list::run(),
         Commands::Outdated => commands::outdated::run(),
+        Commands::Pack {
+            path,
+            output,
+            include_binaries,
+            dry_run,
+        } => commands::pack::run(path, output, include_binaries, dry_run),
         Commands::Tree => commands::tree::run(),
         Commands::Why { package } => commands::why::run(package),
         Commands::Search { query } => commands::search::run(query),
@@ -397,6 +438,7 @@ fn main() {
             CacheAction::Verify => commands::cache::run_verify(),
         },
         Commands::Config { action } => commands::config::run(&action),
+        Commands::Doctor { verbose, fix } => commands::doctor::run(verbose, fix),
         Commands::Keys { action } => commands::keys::run(&action),
         Commands::Verify { package } => commands::verify::run(package),
         Commands::Register => commands::register::run(),

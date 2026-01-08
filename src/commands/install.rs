@@ -3,9 +3,9 @@ use indicatif::{ProgressBar, ProgressStyle};
 use std::env;
 use std::sync::Arc;
 use unrealpm::{
-    find_matching_version, install_package_cas, resolve_dependencies, verify_checksum,
-    verify_signature, Config, Lockfile, Manifest, PrebuiltBinary, ProgressCallback, RegistryClient,
-    ResolverConfig,
+    find_matching_version, install_package_cas, is_package_in_store, resolve_dependencies,
+    verify_checksum, verify_signature, Config, Lockfile, Manifest, PrebuiltBinary,
+    ProgressCallback, RegistryClient, ResolverConfig,
 };
 
 /// Create an indicatif-based progress callback for CLI display
@@ -42,11 +42,17 @@ pub fn run(
     source_only: bool,
     binary_only: bool,
     dry_run: bool,
+    offline: bool,
     verbose_resolve: bool,
     max_depth: Option<usize>,
     resolve_timeout: Option<u64>,
 ) -> Result<()> {
     let current_dir = env::current_dir()?;
+
+    // Offline mode: install from lockfile and cache only
+    if offline {
+        return install_offline(&current_dir, dry_run);
+    }
 
     // Determine installation mode
     let install_mode = if binary_only {
@@ -733,4 +739,155 @@ fn format_available_binaries(binaries: &Option<Vec<PrebuiltBinary>>) -> String {
     } else {
         "  None".to_string()
     }
+}
+
+/// Install packages from lockfile and cache only (offline mode)
+///
+/// This mode:
+/// - Does not make any network requests
+/// - Uses the lockfile to determine exact versions
+/// - Installs from the global CAS store
+/// - Fails if a package is not in the cache
+fn install_offline(project_dir: &std::path::Path, dry_run: bool) -> Result<()> {
+    println!("Installing in offline mode...");
+    println!();
+
+    // Load lockfile
+    let lockfile = match Lockfile::load()? {
+        Some(lf) => lf,
+        None => {
+            anyhow::bail!(
+                "No lockfile found. Offline mode requires a lockfile (unrealpm.lock).\n\n\
+                Run `unrealpm install` (online) first to generate a lockfile,\n\
+                then you can use `unrealpm install --offline` for subsequent installs."
+            );
+        }
+    };
+
+    if lockfile.packages.is_empty() {
+        println!("Lockfile is empty - nothing to install.");
+        return Ok(());
+    }
+
+    println!("Found {} packages in lockfile", lockfile.packages.len());
+    println!();
+
+    // Check which packages are in the cache
+    let mut cached = Vec::new();
+    let mut missing = Vec::new();
+
+    for (name, pkg) in &lockfile.packages {
+        match is_package_in_store(&pkg.checksum) {
+            Ok(true) => cached.push((name.clone(), pkg.clone())),
+            _ => missing.push((name.clone(), pkg.checksum.clone())),
+        }
+    }
+
+    if !missing.is_empty() {
+        println!("Missing packages (not in cache):");
+        for (name, checksum) in &missing {
+            let short_checksum = if checksum.len() > 12 {
+                &checksum[..12]
+            } else {
+                checksum
+            };
+            println!("  - {} ({}...)", name, short_checksum);
+        }
+        println!();
+        anyhow::bail!(
+            "Cannot install offline: {} package(s) not in cache.\n\n\
+            Run `unrealpm install` (online) to download the missing packages,\n\
+            or use `unrealpm cache list` to see what's cached.",
+            missing.len()
+        );
+    }
+
+    if dry_run {
+        println!(
+            "[DRY RUN] Would install {} packages from cache:",
+            cached.len()
+        );
+        for (name, pkg) in &cached {
+            println!("  - {}@{}", name, pkg.version);
+        }
+        println!();
+        println!("[DRY RUN] All packages are cached and ready for offline install.");
+        return Ok(());
+    }
+
+    // Install from cache
+    let pb = ProgressBar::new(cached.len() as u64);
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("[{bar:40.cyan/blue}] {pos}/{len} packages")
+            .unwrap()
+            .progress_chars("#>-"),
+    );
+
+    for (name, pkg) in &cached {
+        pb.set_message(format!("Installing {}@{}", name, pkg.version));
+
+        // Get the store path for this package
+        let store_path = unrealpm::get_package_store_path(&pkg.checksum)?;
+
+        // Link or copy from store to project
+        let plugins_dir = project_dir.join("Plugins");
+        std::fs::create_dir_all(&plugins_dir)?;
+
+        let target_path = plugins_dir.join(name);
+
+        // Find the plugin directory in the store
+        let plugin_store_path = find_plugin_in_store(&store_path, name)?;
+
+        // Link or copy
+        unrealpm::link_or_copy_from_store(&plugin_store_path, &target_path, None)?;
+
+        pb.inc(1);
+    }
+
+    pb.finish_with_message("✓ All packages installed from cache");
+    println!();
+    println!("✓ Installed {} packages in offline mode", cached.len());
+    println!();
+
+    Ok(())
+}
+
+/// Find the plugin directory within a store path
+fn find_plugin_in_store(
+    store_path: &std::path::Path,
+    package_name: &str,
+) -> Result<std::path::PathBuf> {
+    // First, check if the plugin is directly in the store path
+    let uplugin_name = format!("{}.uplugin", package_name);
+    if store_path.join(&uplugin_name).exists() {
+        return Ok(store_path.to_path_buf());
+    }
+
+    // Check subdirectories
+    if let Ok(entries) = std::fs::read_dir(store_path) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                // Check if this dir contains the .uplugin
+                if path.join(&uplugin_name).exists() {
+                    return Ok(path);
+                }
+                // Also check case-insensitive
+                if let Ok(sub_entries) = std::fs::read_dir(&path) {
+                    for sub_entry in sub_entries.flatten() {
+                        let sub_path = sub_entry.path();
+                        if let Some(ext) = sub_path.extension() {
+                            if ext == "uplugin" {
+                                return Ok(path);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Fall back to store path itself
+    Ok(store_path.to_path_buf())
 }
