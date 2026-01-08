@@ -85,20 +85,37 @@ unrealpm publish
 |---------|-------------|
 | `init` | Initialize a new UnrealPM project |
 | `install [package]` | Install dependencies or a specific package |
+| `install --offline` | Install from lockfile and cache only (no network) |
 | `uninstall <package>` | Remove a package |
 | `update [package]` | Update dependencies |
 | `list` | List installed packages |
 | `tree` | Show dependency tree |
 | `search <query>` | Search for packages |
+| `pack` | Create package tarball without publishing |
 | `publish` | Publish a plugin to the registry |
-| `login` | Authenticate with the registry |
+| `unpublish <package>` | Delete a package or version |
+| `yank <package@version>` | Deprecate a version (prevent new installs) |
+| `unyank <package@version>` | Un-deprecate a version |
+| `register` | Create account with email/password |
+| `login` | Authenticate with the registry (supports `--github`) |
 | `logout` | Clear authentication |
+| `whoami` | Show current logged-in user |
+| `tokens create` | Create a long-lived API token |
+| `tokens list` | List your API tokens |
+| `tokens revoke` | Revoke an API token |
+| `cache list` | List cached packages |
+| `cache info` | Show cache statistics |
+| `cache path` | Show cache directory path |
+| `cache clean` | Remove unused packages from cache |
+| `cache verify` | Verify cache integrity |
 | `config` | View or modify configuration |
+| `doctor` | Diagnose setup issues (with `--fix` for auto-repair) |
 | `verify <package>` | Verify package signature |
 | `why <package>` | Explain why a package is installed |
 | `outdated` | Show outdated packages |
 | `keys` | Manage signing keys |
 | `build` | Build plugin binaries |
+| `completions` | Generate shell completions |
 
 ## Configuration
 
